@@ -1,0 +1,33 @@
+# ─────────────────────────────────────────────────────────────
+#  VerificaPE · docker compose
+#
+#  Solo el panel (LAN):       docker compose up -d
+#  Con túnel público gratis:  docker compose --profile tunnel up -d
+#      → la URL https://xxx.trycloudflare.com aparece en:
+#        docker compose logs tunnel
+#      → pégala en el panel (campo «Dirección del servidor»)
+# ─────────────────────────────────────────────────────────────
+services:
+  verificape:
+    build: .
+    container_name: verificape
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      # URL del túnel (opcional): el panel la usa automáticamente en el QR.
+      # Ponla en un archivo .env junto a este compose:  TUNNEL_URL=https://xxx.trycloudflare.com
+      - TUNNEL_URL=${TUNNEL_URL:-}
+    volumes:
+      - ./data:/app/data        # SQLite persiste fuera del contenedor
+    restart: unless-stopped
+
+  # Túnel gratuito de Cloudflare (opcional, perfil "tunnel")
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: verificape-tunnel
+    command: tunnel --url http://verificape:3000 --no-autoupdate
+    depends_on:
+      - verificape
+    restart: unless-stopped
+    profiles: ["tunnel"]

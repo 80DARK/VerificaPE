@@ -1,0 +1,20 @@
+{
+  "name": "verificape-web",
+  "version": "1.1.0",
+  "private": true,
+  "description": "VerificaPE: servidor y panel web que recibe notificaciones cifradas (pagos Yape/Plin/etc.) vía webhook, con push en vivo (SSE) y descifrado E2E en el navegador.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test-e2e.js",
+    "test:api": "node test-api.js",
+    "sound": "node generar-sonido.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.3.0",
+    "express": "^4.19.2"
+  }
+}

@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <title>VerificaPE · Panel web</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%2316A34A' d='M12 2l8 3.5V11c0 5-3.4 8.8-8 11-4.6-2.2-8-6-8-11V5.5L12 2z'/><path fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='M8.5 11.5l2.5 2.5 4.5-4.5'/></svg>">
+</head>
+<body data-theme="dark">
+<div class="app">
+
+  <!-- ══════════ MENÚ LATERAL IZQUIERDO, VERTICAL Y RETRÁCTIL ══════════ -->
+  <aside id="sidebar" class="sidebar">
+    <div class="brand">
+      <span class="brand-icon">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M12 2l8 3.5V11c0 5-3.4 8.8-8 11-4.6-2.2-8-6-8-11V5.5L12 2z" fill="currentColor" opacity=".92"/><path d="M8.5 11.5l2.5 2.5 4.5-4.5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <span class="brand-text">VerificaPE</span>
+    </div>
+    <nav class="nav">
+      <button class="nav-item active" data-view="panel" title="Panel">
+        <span class="ni"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/><circle cx="17.5" cy="4" r="2.4" fill="currentColor" stroke="none"/></svg></span>
+        <span class="nl">Panel</span>
+      </button>
+      <button class="nav-item" data-view="pair" title="Emparejamiento">
+        <span class="ni"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M14 17.5l2.3 2.3L21.5 14"/></svg></span>
+        <span class="nl">Emparejamiento</span>
+      </button>
+      <button class="nav-item" data-view="api" title="API para ComercIA">
+        <span class="ni"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 6.5L3.5 12l5 5.5"/><path d="M15.5 6.5l5 5.5-5 5.5"/><path d="M13.5 4l-3 16"/></svg></span>
+        <span class="nl">API (ComercIA)</span>
+      </button>
+      <button class="nav-item" data-view="stats" title="Estadísticas">
+        <span class="ni"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M6 17.5V21"/><path d="M10 12.5V21"/><path d="M14 15.5V21"/><path d="M18 7.5V21"/></svg></span>
+        <span class="nl">Estadísticas</span>
+      </button>
+      <button class="nav-item" data-view="settings" title="Ajustes">
+        <span class="ni"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="9" y2="6"/><line x1="13" y1="6" x2="20" y2="6"/><circle cx="11" cy="6" r="2"/><line x1="4" y1="12" x2="6" y2="12"/><line x1="10" y1="12" x2="20" y2="12"/><circle cx="8" cy="12" r="2"/><line x1="4" y1="18" x2="14" y2="18"/><line x1="18" y1="18" x2="20" y2="18"/><circle cx="16" cy="18" r="2"/></svg></span>
+        <span class="nl">Ajustes</span>
+      </button>
+    </nav>
+    <div class="sidebar-footer">
+      <span class="muted footer-note">E2E · AES-256-GCM</span>
+      <button id="btn-collapse" class="collapse-btn" title="Recoger / extender el menú">«</button>
+    </div>
+  </aside>
+  <div id="backdrop" class="backdrop hidden"></div>
+
+  <!-- ══════════ CONTENIDO ══════════ -->
+  <div class="main">
+    <header class="topbar">
+      <button id="btn-menu" class="icon-btn" title="Menú">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      </button>
+      <h1 id="view-title">Panel</h1>
+      <span id="conn-pill" class="pill offline" title="Estado de conexión">○ Conectando…</span>
+    </header>
+
+    <main>
+      <!-- ============ PANEL ============ -->
+      <section id="view-panel" class="view active">
+        <div id="secure-warn" class="banner hidden">
+          ⚠️ Este navegador no está en un <b>contexto seguro</b> (abre el panel en
+          <code>localhost</code> o por HTTPS).
+        </div>
+        <div class="toolbar-row">
+          <input id="search" type="search" placeholder="🔍 Buscar en notificaciones…">
+          <select id="app-filter" title="Filtrar por app"><option value="">Todas las apps</option></select>
+          <button id="btn-refresh" class="icon-btn" title="Refrescar ahora">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+          </button>
+          <button id="btn-read-all" class="icon-btn" title="Marcar todo como leído">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12.5l5 5L21 6.5"/></svg>
+          </button>
+        </div>
+        <div id="decrypt-warn" class="banner hidden">
+          🔒 Hay mensajes que no se pudieron descifrar con la clave guardada en este navegador.
+        </div>
+        <div id="feed" class="feed"></div>
+        <div id="empty" class="empty hidden">
+          <div class="empty-icon">
+            <svg width="54" height="54" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+          </div>
+          <h3>Aún no hay notificaciones</h3>
+          <p>Empareja tu Android desde la sección <b>Emparejamiento</b>, activa las apps
+             que quieras monitorear y las verás aparecer aquí al instante.</p>
+        </div>
+      </section>
+
+      <!-- ============ EMPAREJAMIENTO ============ -->
+      <section id="view-pair" class="view">
+        <div class="card">
+          <h2>Emparejar la app Android</h2>
+          <ol class="steps">
+            <li>Instala y abre <b>VerificaPE</b> en el teléfono del dueño de la billetera.</li>
+            <li>Concede el <b>acceso a notificaciones</b> cuando el sistema lo pida.</li>
+            <li>Menú lateral → <b>Emparejar</b> → <b>Escanear código QR</b>.</li>
+            <li>Apunta la cámara al código de abajo. ¡Listo!</li>
+          </ol>
+          <p class="muted">Después activa app por app cuáles quieres monitorear
+             (en «Apps monitoreadas», todo está desactivado por defecto).</p>
+
+          <label class="field-label" for="server-url">Dirección del servidor que verá el teléfono
+            <input id="server-url" type="text" spellcheck="false">
+          </label>
+          <p id="tunnel-note" class="muted tiny hidden"></p>
+          <p class="muted tiny">Si usas <code>start.ps1</code> o el <code>docker compose --profile tunnel</code>,
+             el túnel gratuito de Cloudflare se configura solo y el QR apunta a la URL pública
+             <code>https://…trycloudflare.com</code>. También puedes poner a mano la IP local o tu propia URL.</p>
+
+          <div class="qr-wrap">
+            <div id="qr"></div>
+          </div>
+
+          <label class="field-label" for="pair-string">Código de emparejamiento (para copiar o pegar)
+            <textarea id="pair-string" readonly rows="3"></textarea>
+          </label>
+          <div class="row">
+            <button id="btn-copy">Copiar código</button>
+            <button id="btn-regen" class="secondary">Regenerar emparejamiento</button>
+          </div>
+          <p class="muted tiny">Canal: <code id="channel-id"></code></p>
+        </div>
+
+        <div class="card danger">
+          <h3>Zona sensible</h3>
+          <p class="muted tiny">«Eliminar canal» borra del servidor el canal y TODOS sus mensajes
+             cifrados. «Olvidar» solo borra las claves de este navegador.</p>
+          <div class="row">
+            <button id="btn-delete-channel" class="danger">Eliminar canal del servidor</button>
+            <button id="btn-forget" class="secondary">Olvidar en este navegador</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ API PARA COMERCIA ============ -->
+      <section id="view-api" class="view">
+        <div class="card">
+          <h2>API para ComercIA</h2>
+          <p class="muted">Crea un <b>token de API</b> para que tu bot de WhatsApp (ComercIA)
+             consulte los pagos recibidos. El bot descifra los mensajes localmente con la
+             <b>clave AES</b>: el servidor sigue sin ver nada (E2E). Filtros disponibles en
+             <code>cliente-verificape.js</code>: palabra clave, nombre, monto (S/), fecha, app
+             y rango de fechas.</p>
+
+          <div id="api-no-token">
+            <p class="muted tiny">Aún no hay token de API para este canal.</p>
+            <div class="row">
+              <button id="btn-api-gen">🔑 Generar token de API</button>
+            </div>
+          </div>
+
+          <div id="api-token-block" class="hidden">
+            <div class="kv">
+              <div class="kv-row">
+                <span class="kv-k">Servidor</span>
+                <code id="api-url-value" class="kv-v"></code>
+              </div>
+              <div class="kv-row">
+                <span class="kv-k">Token de API</span>
+                <code id="api-token-value" class="kv-v mono"></code>
+                <button id="btn-copy-token" class="mini-btn" title="Copiar token">Copiar</button>
+              </div>
+              <div class="kv-row">
+                <span class="kv-k">Clave AES (E2E)</span>
+                <code id="api-key-value" class="kv-v mono"></code>
+                <button id="btn-copy-key" class="mini-btn" title="Copiar clave">Copiar</button>
+              </div>
+              <div class="kv-row">
+                <span class="kv-k">Canal</span>
+                <code id="api-channel-value" class="kv-v mono"></code>
+              </div>
+            </div>
+
+            <label class="field-label">Configuración completa para ComercIA (JSON)
+              <pre id="api-config" class="code-block"></pre>
+            </label>
+            <div class="row">
+              <button id="btn-copy-config" class="secondary">Copiar configuración</button>
+            </div>
+
+            <label class="field-label">Ejemplo con curl
+              <pre id="api-example-curl" class="code-block"></pre>
+            </label>
+            <div class="row">
+              <button id="btn-copy-curl" class="secondary">Copiar comando</button>
+            </div>
+
+            <label class="field-label">Ejemplo con el cliente de Node (cliente-verificape.js)
+              <pre id="api-example-node" class="code-block"></pre>
+            </label>
+
+            <div class="row">
+              <button id="btn-api-revoke" class="danger">Revocar token</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Endpoints de la API v1</h3>
+          <pre class="code-block">GET  /api/v1/ping                    → estado del servicio
+GET  /api/v1/messages?since=&from=&to=&limit=
+     → mensajes CIFRADOS (desde/hasta en ms epoch; límite máx. 1000)
+GET  /api/v1/stats                    → total, último id, primeras/últimas fechas
+Header de autenticación:  X-API-Token: <token></pre>
+          <p class="muted tiny">Los filtros de fecha se aplican en el servidor; los de texto
+             (palabra clave, nombre, monto, app) se aplican en tu bot tras descifrar —
+             así el E2E se mantiene intacto.</p>
+        </div>
+      </section>
+
+      <!-- ============ ESTADÍSTICAS ============ -->
+      <section id="view-stats" class="view">
+        <div id="stats-cards" class="stats-grid"></div>
+        <div class="card">
+          <h3>Por aplicación</h3>
+          <div id="stats-apps" class="bar-list"></div>
+        </div>
+        <div class="card">
+          <h3>Por dispositivo</h3>
+          <div id="stats-devices" class="bar-list"></div>
+        </div>
+      </section>
+
+      <!-- ============ AJUSTES ============ -->
+      <section id="view-settings" class="view">
+        <div class="card">
+          <h3>Tiempo real</h3>
+          <p class="muted tiny">El panel recibe cada notificación <b>al instante</b> por push (SSE).
+             El sondeo de abajo es solo un respaldo por si el push se corta.</p>
+          <label class="field-label" for="refresh-interval">Sondeo de respaldo
+            <select id="refresh-interval">
+              <option value="0">Desactivado (solo push)</option>
+              <option value="2000">Cada 2 segundos</option>
+              <option value="5000" selected>Cada 5 segundos</option>
+              <option value="10000">Cada 10 segundos</option>
+              <option value="30000">Cada 30 segundos</option>
+            </select>
+          </label>
+        </div>
+        <div class="card">
+          <h3>Sonido y alertas</h3>
+          <label class="field-label" for="sound-toggle">Sonido al recibir una notificación
+            <select id="sound-toggle">
+              <option value="on">Activado 🔔</option>
+              <option value="off">Desactivado 🔇</option>
+            </select>
+          </label>
+          <div class="row">
+            <button id="btn-test-sound" class="secondary">🔊 Probar sonido</button>
+          </div>
+          <p id="sound-warn" class="muted tiny hidden">⚠️ El navegador bloqueó el audio hasta tu
+             primer clic: pulsa <b>Probar sonido</b> o toca cualquier parte de la página una vez
+             y queda activado para siempre.</p>
+        </div>
+        <div class="card">
+          <h3>Tema</h3>
+          <label class="field-label" for="theme">Apariencia
+            <select id="theme">
+              <option value="dark" selected>Oscuro</option>
+              <option value="light">Claro</option>
+            </select>
+          </label>
+        </div>
+        <div class="card">
+          <h3>Datos</h3>
+          <p class="muted tiny">El servidor guarda hasta <b>5 000</b> mensajes cifrados por canal
+             (se recortan automáticamente los más antiguos). Tu historial descifrado vive solo
+             en este navegador mientras la pestaña esté abierta.</p>
+          <div class="row">
+            <button id="btn-clear-server" class="danger">Borrar todos los mensajes del servidor</button>
+          </div>
+        </div>
+        <div class="card">
+          <h3>Acerca de</h3>
+          <p class="muted tiny">VerificaPE v1.2 — verifica pagos (Yape, Plin, banca…) al instante:
+             las notificaciones del teléfono del dueño llegan cifradas de extremo a extremo
+             (AES-256-GCM) a este panel, con API para bots (ComercIA). El servidor nunca ve el
+             contenido. Úsalo únicamente en dispositivos propios o con consentimiento explícito.</p>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<script src="/vendor/qrcode.min.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>
