@@ -7,6 +7,7 @@ android/build/
 android/app/build/
 android/local.properties
 android/app/notibridge.keystore
+android/keystore.properties
 *.keystore
 *.jks
 

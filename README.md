@@ -1,228 +1,228 @@
-# ✅ VerificaPE
+# VerificaPE 🇵🇪
 
-**Verifica pagos (Yape, Plin, banca…) al instante y sin dejarte engañar.**
+> **Verificación en tiempo real y anti-estafa para pagos digitales en Perú.**
+> Cero capturas falsas, cero intermediarios.
 
-VerificaPE son dos piezas que trabajan juntas:
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+[![Android](https://img.shields.io/badge/Android-Kotlin-3DDC84?logo=android&logoColor=white)](https://kotlinlang.org/)
+[![Backend](https://img.shields.io/badge/Backend-Node.js%20%7C%20Express-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 
-- una **app Android** que se instala en el celular del **dueño de la billetera**,
-  lee las notificaciones de pago (solo de las apps que tú actives) y las envía
-  **cifradas de extremo a extremo** a tu servidor, y
-- un **panel web** (en Docker) donde quien atiende el cajón ve cada pago
-  **al instante** (push en vivo, menos de 1 segundo) y **con sonido de caja**
-  🔔 — verificar un Yape queda tan rápido como contar un billete.
+---
 
+## 1. El problema que resuelve
+
+En el comercio peruano diario (bodegas, minimarkets, restaurantes, ferreterías…),
+una de las estafas más frecuentes es el uso de **capturas adulteradas** o apps
+clonadas de billeteras como Yape o Plin: el estafador simula una transferencia
+exitosa mientras el cajero, por prisa, entrega la mercadería.
+
+**VerificaPE** resuelve esto de raíz validando el pago **desde el dispositivo
+que lo recibe**: la app intercepta la notificación legítima en el celular del
+negocio, la filtra, la cifra y la muestra al instante en la pantalla del cajero.
+Ya no hace falta confiar en la pantalla del cliente.
+
+## 2. Características
+
+| Componente | Característica | Descripción |
+| :--- | :--- | :--- |
+| App Android | **Seguridad por defecto** | Lee notificaciones SOLO de las apps que actives; todo viene desactivado |
+| App Android | **Filtro Anti-OTP permanente** | Bloquea siempre la app de SMS y cualquier código de verificación: no se guarda ni se envía |
+| App Android | **Cifrado E2E** | AES-256-GCM con clave compartida solo por QR; el servidor solo ve ciphertext |
+| App Android | **Botón de dormir** | Interruptor circular en Inicio para suspender la escucha sin desinstalar nada |
+| App Android | **Multi-QR** | Conecta varios paneles a la vez (cada uno con su propia clave) |
+| App Android | **Persistencia** | Sigue escuchando tras cerrar la app o reiniciar (servicio del sistema + exención de batería) |
+| App Android | **DB propia** | Historial local con Room, independiente de la web |
+| Panel Web | **Push en vivo** | Server-Sent Events: cada pago aparece en menos de 1 segundo |
+| Panel Web | **Sonido de caja** 🔔 | Campanilla configurable al llegar un pago, con botón de prueba |
+| Panel Web | **Menú lateral retráctil** | Sidebar izquierda colapsable (deslizante en móvil), tema claro/oscuro |
+| Panel Web | **Autohospedado** | Docker con Node.js, Express y SQLite (volumen persistente) |
+| Panel Web | **Túnel gratuito** | Perfil `tunnel` con cloudflared: URL pública HTTPS sin cuenta |
+| API | **API v1 con token** | Tokens pausables y revocables; mensajes ya descifrados; clave AES guardada envuelta con el propio token |
+| API | **Cliente Node.js** | `cliente-verificape.js` sin dependencias, con filtros por palabra clave, nombre, monto, fecha y app |
+
+## 3. Arquitectura
+
+```text
+  [ Celular del negocio (Android) ]
+  ┌───────────────────────────────────────────────────────┐
+  │  Notificación legítima (Yape / Plin / banco)          │
+  │            │                                          │
+  │            ▼                                          │
+  │  [ Filtro Anti-OTP: SMS y códigos 2FA descartados ]   │
+  │            │                                          │
+  │            ▼                                          │
+  │  [ Historial local (Room) ]                           │
+  │            │                                          │
+  │            ▼                                          │
+  │  [ Cifrado AES-256-GCM · clave compartida por QR ]    │
+  └────────────┬──────────────────────────────────────────┘
+               │ HTTPS (payload cifrado)
+               ▼
+   [ Túnel Cloudflare (opcional, cloudflared) ]
+               │
+               ▼
+  [ Servidor / Panel Web (docker compose) ]
+  ┌───────────────────────────────────────────────────────┐
+  │  Node.js + Express · SQLite (mensajes cifrados)       │
+  │            │                                          │
+  │      ┌─────┴──────┐                                   │
+  │      ▼            ▼                                    │
+  │ [ Push SSE ]   [ API v1 con token ]                    │
+  │  (< 1 s)        (mensajes descifrados)                │
+  │      │            │                                   │
+  │      ▼            ▼                                    │
+  │ [ Panel caja ]  [ Bot / integración ]                  │
+  │   + sonido 🔔   + cliente-verificape.js                │
+  └───────────────────────────────────────────────────────┘
 ```
-┌──────────────┐   QR (clave AES + tokens)   ┌──────────────┐
-│  App Android │ ◄──────────────────────────►│   Página web │
-│  (dueño de   │                             │  (caja)      │
-│   la Yape)   │      AES-256-GCM           │              │
-│ Room (DB)    │────────────────────────────►│  descifra    │
-│  historial   │   POST /api/webhook/:id    │  en navegador │
-│  propio      │   (solo ciphertext)        │  ┌─────────┐ │
-└──────────────┘        ┌───────────┐       │  │ SQLite  │ │
-                        │  Docker 🐳 │──────►│  │ (DB)    │ │
-                        │ cloudflared│  push │  └─────────┘ │
-                        │  túnel 🌐  │  SSE   └──────────────┘
-                        └───────────┘
-```
 
-## ✅ Funciones
+## 4. Requisitos
 
-| Requisito | Cómo se cumple |
-|---|---|
-| App Android que lee notificaciones | `NotificationListenerService` (Kotlin nativo) |
-| Envío a la web vía **webhook** | `POST /api/webhook/:canal` |
-| App y web con **su propia DB** | Room/SQLite local · SQLite en el contenedor (volumen persistente) |
-| **Ignorar OTP por SMS** | Filtro SIEMPRE activo: bloquea la app de SMS y notificaciones con apariencia de código OTP. Sin guardar ni enviar el contenido |
-| Ver **apps instaladas** y activar/desactivar cada una | Sección «Apps monitoreadas» con interruptor por app |
-| **Todo desactivado por defecto** | Cada app nueva entra con `enabled = false` |
-| **Emparejar escaneando un QR** | La web genera el QR; la app lo escanea (o pegas el código) |
-| **Varios QR a la vez** (multi-canal) | Escanea todos los paneles que quieras: cada notificación se envía cifrada a TODOS |
-| ⏸ **Botón de dormir** (circular, en Inicio) | Apaga la escucha sin desinstalar ni forzar detención: nada se lee ni se envía hasta que lo reactives |
-| 🔋 **Sigue escuchando tras cerrar la app o reiniciar** | Servicio enlazado al sistema (se reengancha solo) + exención de batería en un clic |
-| **Cifrado extremo a extremo** | AES-256-GCM; la clave solo viaja en el QR; el servidor solo ve ciphertext |
-| **Menú lateral izquierdo, vertical y retráctil** | App: `DrawerLayout` + `NavigationView` · Web: sidebar colapsable |
-| ⚡ **Latencia < 1 segundo** | Push en vivo por **SSE** (test real: 7–15 ms) + sondeo de respaldo |
-| 🔔 **Sonido de notificación** | Campanilla «di-ding» al llegar un pago (activable, con botón de prueba) |
-| 🐳 **Docker** | `Dockerfile` + `docker compose` (con túnel opcional incluido) |
-| 🌐 **Túnel gratuito Cloudflare** | `start.ps1` / perfil `tunnel` del compose |
-| 🔌 **API de acceso** | Sección «API»: token con pausa/revocación + `cliente-verificape.js` con filtros (palabra, nombre, monto, fecha, app) |
+- **Web**: Docker (Desktop en Windows / Engine en Linux). Node.js 18+ solo para
+  los tests.
+- **Android**: la APK precompilada (ver *Instalación de la app*) o Android
+  Studio con JDK 17 para compilar.
+- **Red**: el teléfono y el servidor deben poder comunicarse (misma red, IP
+  local o el túnel público de Cloudflare).
 
-## 🚀 Puesta en marcha
-
-### 1) Web con Docker (recomendado)
-
-Requisitos: Docker (Desktop en Windows / Engine en Linux) y Node 18+ solo
-para el test.
+## 5. Instalación de la web (Docker)
 
 ```bash
 cd web
-docker compose up -d --build        # construye y arranca el panel en :3000
-docker compose logs -f verificape   # espera el banner "escuchando"
+docker compose up -d --build          # panel en http://localhost:3000
 ```
 
-La base de datos queda en `web/data/` (volumen montado) y sobrevive a
+La base de datos SQLite queda en `web/data/` (volumen) y sobrevive a
 reinicios y actualizaciones de la imagen.
 
-**Con túnel público gratis** (el teléfono funciona hasta con datos móviles):
+**Con túnel público HTTPS gratuito** (el teléfono funciona incluso con
+datos móviles):
 
 ```bash
 docker compose --profile tunnel up -d --build
-docker compose logs tunnel          # copia la URL https://xxx.trycloudflare.com
+docker compose logs tunnel            # copia la URL https://xxx.trycloudflare.com
 ```
 
-Pega esa URL en el panel (Emparejamiento → «Dirección del servidor») o ponla
-en `web/.env` como `TUNNEL_URL=…` y recrea el contenedor: el QR la tomará
-solo. Las URLs de Quick Tunnel cambian al reiniciar; para una fija crea un
-túnel con nombre con tu cuenta de Cloudflare.
+Pega esa URL en el panel («Emparejamiento → Dirección del servidor») o
+defínela en `web/.env` como `TUNNEL_URL=…` y recrea el contenedor. En
+Windows también puedes usar `start.ps1` sin Docker.
 
-En Windows también puedes usar `start.ps1` (o doble clic en `start.bat`),
-que arranca servidor + túnel y muestra la URL sin Docker.
+> Las URLs de Quick Tunnel cambian al reiniciar; para una URL fija crea un
+> túnel con nombre con tu cuenta de Cloudflare.
 
-### 2) App Android
+## 6. Instalación de la app Android
 
-**APK ya compilada y firmada:** `dist/VerificaPE-1.1.0.apk`
-(keystore `android/app/notibridge.keystore`, alias `notibridge`,
-contraseña `notibridge2026` — clave personal inventada). Cópiala al teléfono,
-instálala como «app desconocida» (no uses SAI: es para APKs divididas y falla
-con content:// URIs) y:
+1. Descarga la APK desde **GitHub Releases** del repositorio.
+2. Instálala en el teléfono del dueño de la billetera (permiso «instalar apps
+   desconocidas»). *Ojo: SAI da problemas con APKs normales; usa el instalador
+   del sistema.*
+3. Ábrela → **Conceder acceso** a notificaciones (ajustes del sistema).
+4. En **Ajustes → Liberar de la optimización de batería** (fiabilidad en
+   Xiaomi/Huawei).
 
-1. Ábrela → **Conceder acceso** a notificaciones (ajustes del sistema).
-2. Menú → **Emparejar** → escanea el **QR** del panel web.
-3. Menú → **Apps monitoreadas** → activa **Yape** (y las que quieras).
-   *Nada se lee hasta que tú lo actives.*
-4. En la web: pulsa una vez **Probar sonido** 🔔 (el navegador exige un clic
-   antes de reproducir audio; luego suena solo).
-
-Para recompilar: abre `android/` en Android Studio o
-`gradle assembleRelease` (JDK 17). Mantener `applicationId` te deja instalar
-actualizaciones sin desinstalar.
-
-### 3) Verificación
+Los que compilan desde el código: `android/keystore.properties` guarda las
+credenciales de firma **localmente** (está excluido de git). Sin ese archivo,
+las builds release se firman con la clave debug; crea tu propio keystore con
+`keytool` si quieres firmar con clave propia:
 
 ```bash
-cd web
-docker compose up -d
-node test-e2e.js     # 12 pruebas: cifrado, webhook, push SSE (<1 s), borrados…
+keytool -genkeypair -keystore android/app/mi-clave.keystore \
+        -alias verificape -keyalg RSA -keysize 2048 -validity 10950
+# y en android/keystore.properties:
+#   storeFile=app/mi-clave.keystore
+#   storePassword=...  keyAlias=...  keyPassword=...
 ```
 
-## 🧠 Flujo técnico
+## 7. Emparejamiento (QR)
 
-1. El **navegador** crea `canal (UUID) + clave AES + tokens` y registra en el
-   servidor **solo los hashes SHA-256** de los tokens.
-2. El **QR** lleva: URL del servidor, canal, clave AES y token de escritura.
-3. La **app** cifra cada notificación permitida con AES-256-GCM y la POSTea
-   al webhook (`X-Write-Token`).
-4. El **servidor** (Docker) valida el token, guarda `{iv, ct}` en SQLite y
-   hace **push SSE instantáneo** a todos los paneles conectados.
-5. El **navegador** descifra con WebCrypto, pinta la tarjeta y **suena la
-   campanilla**. El sondeo cada 5 s es solo respaldo.
-6. OTP/SMS: bloqueado antes de cifrar — nunca salen del teléfono.
+1. Abre el panel web: el QR de emparejamiento se genera solo.
+2. En la app: menú lateral → **Emparejar** → **Escanear código QR**
+   (funciona en vertical) — o pega el código `notibridge://pair?…` a mano.
+3. Menú → **Apps monitoreadas** → activa Yape (o las apps que quieras).
+   *Nada se lee hasta que tú lo actives.*
+4. Pulsa **Probar sonido** en la web una vez (el navegador exige un clic
+   antes de reproducir audio) y usa **Probar** en la app para enviar un
+   mensaje de prueba.
+5. ¿Varias cajas? Escanea el QR de cada panel: cada notificación llegará a
+   todas. El botón circular de Inicio duerme la escucha cuando cierres.
 
-## ⚙️ Ajustes del panel
+## 8. API v1 (bots e integraciones)
 
-- **Tiempo real:** pill «⚡ En vivo» = push SSE activo; «● Conectado» = sondeo.
-- **Sonido:** Ajustes → Sonido y alertas (Activado/Desactivado + Probar sonido).
-- **Estadísticas:** por app, por dispositivo, últimas 24 h.
-- **Tema:** oscuro/claro. Menú lateral: colapsable con «», deslizante en móvil.
+El panel tiene una sección **API** para crear tokens con un clic
+(pausables y revocables). Los mensajes se entregan **ya descifrados**;
+el consumidor solo necesita el token (transporte por HTTPS).
 
-## ⚠️ Notas y limitaciones
+| Endpoint | Descripción |
+|---|---|
+| `GET /api/v1/ping` | Estado del servicio |
+| `GET /api/v1/messages?since=&from=&to=&limit=` | Mensajes descifrados (fechas en ms epoch) |
+| `GET /api/v1/stats` | Total, último id y fechas extremas |
 
-- **¿Sigue escuchando si cierras la app o reinicias el teléfono?** Sí: el
-  lector de notificaciones es un servicio *enlazado al sistema* (no lo matan
-  ni el cierre de la app ni el reinicio — el sistema lo reengancha solo).
-  Para máxima fiabilidad en celulares agresivos con la batería (Xiaomi,
-  Huawei…), usa **Ajustes → Liberar de la optimización de batería**.
-  Tras una actualización de la app, VerificaPE pide reengancharse
-  automáticamente al abrirse. Si el teléfono está **apagado**, ninguna app
-  puede escuchar: al encenderlo, el servicio se reconecta y captura todo lo
-  que llegue desde ese momento.
-- **Dormir el servicio**: el botón circular de Inicio detiene la lectura
-  (nada se lee, guarda ni envía) sin tocar permisos ni desinstalar. Toca
-  otra vez para despertarlo.
-- La latencia total es la del viaje teléfono→servidor (LAN ≈ instantáneo;
-  túnel ≈ 0.1–0.5 s) + unos milisegundos de SSE.
-- Si tu teléfono demora en *emitir* la notificación (estilo Xiaomi/Huawei),
-  libera la optimización de batería para VerificaPE.
-- `QUERY_ALL_PACKAGES` es necesario para listar apps (normal en APK propia).
-- `usesCleartextTraffic="true"` está activo para pruebas en LAN HTTP;
-  elimínalo si el servidor va tras HTTPS.
-- Mensajes: hasta 5 000 por canal en el servidor (recorte automático).
+Autenticación con la cabecera `X-API-Token`. Token en pausa → `403` ·
+token inválido o revocado → `401`.
 
-## 🔌 API de acceso (bots y servicios)
-
-El panel trae una sección **API** en el menú lateral donde generas un token
-con un clic, lo **pausas** temporalmente o lo **revocas**.
-
-Desde la v1.2 la API entrega los mensajes **ya descifrados**: el consumidor
-solo necesita el token (el transporte va protegido por HTTPS).
-
-**Modelo de seguridad (v1.3)**: al crear el token, la clave del canal se
-guarda en el servidor **envuelta** (AES-256-GCM) con una clave derivada del
-**propio token**. La base de datos nunca contiene la clave en texto claro:
-para desenvolverla se necesita el token completo, que solo tiene el
-consumidor — el hash del token almacenado no sirve para eso. Una fuga de la
-base de datos (dump, backup) no revela ninguna clave; la clave se desenvuelve
-solo en memoria, durante cada petición autenticada. El panel sigue siendo E2E
-y la clave AES no se muestra en la sección API (el consumidor solo necesita
-el token). Advertencia honesta: un servidor *activo y malicioso* podría
-registrar tokens o respuestas — si tu amenaza incluye al propio servidor,
-no actives la API.
-
-**Endpoints v1** (autenticación con cabecera `X-API-Token`):
-
-```
-GET /api/v1/ping                                 → estado del servicio
-GET /api/v1/messages?since=&from=&to=&limit=    → mensajes DESCIFRADOS (fecha en ms)
-GET /api/v1/stats                                → total, ids y fechas extremas
-Token en pausa → 403 · Token inválido o revocado → 401
-```
-
-Filtros de **fecha/rango/límite** corren en el servidor. Los de texto
-(**palabra clave, nombre, monto, app**) están listos en la librería
-`web/cliente-verificape.js` (Node 18+, sin dependencias, solo token):
+Ejemplo con el cliente de Node (`web/cliente-verificape.js`, sin dependencias):
 
 ```js
 const { VerificaPE } = require('./cliente-verificape')
 
 const vpe = new VerificaPE({
-  baseUrl:  'https://tu-servidor.com',   // copia del panel, sección API
+  baseUrl: 'https://tu-servidor.com',   // copia del panel, sección API
   apiToken: 'xxxx'                        // token de API
 })
 
 // ¿Llegó el Yape de S/ 25 de María hoy?
 const pagos = await vpe.mensajes({ monto: 25, nombre: 'Maria', fecha: '2026-10-21' })
-const ultimo = await vpe.ultimo()          // la notificación más reciente
+const ultimo = await vpe.ultimo()
 ```
 
-Filtros disponibles: `q` (palabra clave), `nombre`, `monto` (S/), `fecha`
-(día), `app`, `desde`, `hasta`, `desdeId`, `limite` — combinables entre sí.
-Prueba todo con `npm run test:api` (26 verificaciones).
+Filtros combinables: `q` (palabra clave), `nombre`, `monto` (S/), `fecha`
+(día), `app`, `desde`, `hasta`, `desdeId`, `limite`.
 
-## 📦 Publicar en GitHub
+## 9. Seguridad y privacidad
 
-El proyecto ya trae `.gitignore` raíz — quedan fuera los secretos
-(`notibridge.keystore`, `web/.env`) y los binarios (`dist/`, `node_modules/`,
-`web/data/`):
+- **E2E en el panel**: la clave AES-256 solo viaja dentro del QR; el servidor
+  almacena los mensajes como ciphertext y el navegador descifra con WebCrypto.
+- **OTP blindado**: la app de SMS y las notificaciones con apariencia de código
+  de verificación se descartan SIEMPRE, sin guardar su contenido.
+- **API sin secretos en la DB**: al crear un token, la clave del canal se guarda
+  **envuelta** (AES-256-GCM) con una clave derivada del propio token; se
+  desenvuelve solo en memoria durante cada petición. Una fuga de la base de
+  datos no revela claves.
+- **Advertencia honesta**: un servidor *activo y malicioso* podría registrar
+  tokens o respuestas en el modo API descifrada. Si tu modelo de amenaza
+  incluye al propio servidor, no actives la API (el panel sigue siendo E2E).
+
+## 10. Pruebas
 
 ```bash
-git init
-git add .
-git commit -m "VerificaPE v1.2: panel E2E en tiempo real + API para bots"
-# crea el repo en github.com y:
+cd web
+docker compose up -d
+npm test          # E2E del canal cifrado (12 verificaciones)
+npm run test:api  # API v1 + filtros + pausa + seguridad en disco (27)
+```
+
+## 11. Publicar en GitHub
+
+El proyecto incluye `.gitignore` raíz: secretos (`keystore.properties`,
+`*.keystore`, `web/.env`) y binarios (`dist/`, `node_modules/`, `web/data/`)
+quedan fuera del control de versiones. Las APKs van en **GitHub Releases**.
+
+```bash
 git remote add origin https://github.com/TU_USUARIO/verificape.git
 git branch -M main
 git push -u origin main
 ```
 
-Para distribuir la APK usa **GitHub Releases** (no la subas al git). Los que
-clonen el repo podrán compilar con su propia clave: el build firma con la
-clave debug si no encuentran `notibridge.keystore`.
+## 12. Uso responsable
 
-## ⚖️ Uso responsable
+VerificaPE está pensado para que el **dueño de la billetera** verifique sus
+propios pagos en su propio negocio: notificaciones de su propio teléfono
+hacia su propio panel, cifradas. Instálalo solo en dispositivos propios o
+con consentimiento explícito del dueño. Reenviar notificaciones de terceros
+sin permiso puede ser ilegal en tu jurisdicción.
 
-VerificaPE está pensado para el **dueño de la billetera** que quiere
-verificar sus propios pagos en su propio negocio: notificaciones de su
-propio teléfono hacia su propio panel, cifradas. Instálalo solo en
-dispositivos propios o con consentimiento explícito del dueño. Reenviar
-notificaciones de terceros sin permiso puede ser ilegal.
+## 13. Licencia
+
+MIT — ver [LICENSE](LICENSE).

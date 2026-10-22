@@ -17,16 +17,21 @@ android {
         versionName "1.2.1"
     }
 
-    // La clave de firma es PERSONAL y no se sube al repositorio (.gitignore).
-    // Si existe, se firma con ella; si no, la release se firma con la clave debug.
+    // La clave de firma es PERSONAL y vive en android/keystore.properties
+    // (excluido de git). Sin ese archivo, la release se firma con la clave debug.
     def ksFile = file('notibridge.keystore')
-    if (ksFile.exists()) {
+    def ksPropsFile = rootProject.file('keystore.properties')
+    def ksProps = new Properties()
+    if (ksPropsFile.exists()) {
+        ksPropsFile.withInputStream { ksProps.load(it) }
+    }
+    if (ksFile.exists() && ksProps.getProperty('storePassword')) {
         signingConfigs {
             release {
                 storeFile ksFile
-                storePassword 'notibridge2026'
-                keyAlias 'notibridge'
-                keyPassword 'notibridge2026'
+                storePassword ksProps.getProperty('storePassword')
+                keyAlias ksProps.getProperty('keyAlias')
+                keyPassword ksProps.getProperty('keyPassword')
             }
         }
     }
@@ -35,7 +40,11 @@ android {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            signingConfig ksFile.exists() ? signingConfigs.release : signingConfigs.debug
+            if (ksFile.exists() && ksProps.getProperty('storePassword')) {
+                signingConfig signingConfigs.release
+            } else {
+                signingConfig signingConfigs.debug
+            }
         }
     }
 
