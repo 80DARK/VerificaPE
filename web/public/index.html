@@ -146,9 +146,10 @@
 
           <div id="api-no-token">
             <p class="muted tiny">Aún no hay token de API para este canal.</p>
-            <p class="muted tiny">⚠️ Al crear el token, el servidor guarda una copia de la clave de
-               este canal para poder descifrar y entregar los mensajes por la API. El panel sigue
-               siendo E2E; si no quieres que el servidor pueda descifrar, no crees el token.</p>
+            <p class="muted tiny">🔒 Al crear el token, la clave del canal se guarda en el servidor
+               <b>ENVUELTA (cifrada) con el propio token</b>: una fuga de la base de datos sola no
+               revela nada, y el panel sigue siendo E2E. Si no confías ni así en el servidor,
+               simplemente no actives la API.</p>
             <div class="row">
               <button id="btn-api-gen">🔑 Generar token de API</button>
             </div>
@@ -160,6 +161,7 @@
               <button id="btn-api-pause" class="secondary">⏸ Pausar</button>
               <button id="btn-api-revoke" class="danger">Revocar token</button>
             </div>
+            <p id="api-mode-note" class="muted tiny hidden"></p>
 
             <div class="kv">
               <div class="kv-row">
@@ -178,6 +180,7 @@
               <div class="kv-row">
                 <span class="kv-k">Clave AES (E2E del panel)</span>
                 <code id="api-key-value" class="kv-v mono"></code>
+                <button id="btn-toggle-key" class="mini-btn" title="Mostrar / ocultar">👁</button>
                 <button id="btn-copy-key" class="mini-btn" title="Copiar clave">Copiar</button>
               </div>
             </div>

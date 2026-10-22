@@ -60,17 +60,35 @@ async function main () {
   check('registro del canal', reg.ok === true)
 
   // ── Registrar el token de API (como lo hace el panel) ─────────────
-  // Desde la v1.2 el panel envía también la clave AES: la API entrega
-  // los mensajes ya DESCIFRADOS y el consumidor solo necesita el token.
+  // v1.3: el panel envía el token y la clave; el servidor guarda la clave
+  // ENVUELTA con el propio token (nunca en texto claro en la DB).
   const apiReg = await fetch(
     `${BASE}/api/api-token?channel=${encodeURIComponent(channelId)}&token=${encodeURIComponent(b64url(readToken))}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ apiHash: sha256Hex(apiToken), key: b64url(aesKey) })
+      body: JSON.stringify({ apiToken: b64url(apiToken), key: b64url(aesKey) })
     }
   ).then(r => r.json())
-  check('registro del token de API (con clave para modo descifrado)', apiReg.ok === true)
+  check('registro del token de API (clave envuelta con el token)', apiReg.ok === true)
+
+  // ── Seguridad: la DB NO contiene la clave en texto claro ───────────
+  const fs = require('fs')
+  const path = require('path')
+  const dbPath = path.join(__dirname, 'data', 'notibridge.db')
+  if (BASE.startsWith('http://localhost') && fs.existsSync(dbPath)) {
+    const Database = require('better-sqlite3')
+    const localDb = new Database(dbPath, { readonly: true })
+    const row = localDb.prepare('SELECT * FROM channels WHERE id = ?').get(channelId)
+    localDb.close()
+    check('la DB guarda la clave ENVUELTA (no existe columna en claro)',
+      !!row.api_key_wrapped &&
+      !('api_key' in row) &&
+      row.api_key_wrapped !== b64url(aesKey) &&
+      !row.api_key_wrapped.includes(b64url(aesKey).slice(0, 16)))
+  } else {
+    console.log('  · (DB remota: se omite la verificación de disco)')
+  }
 
   // ── Enviar 3 pagos de prueba (como la app Android) ────────────────
   await postNotif(channelId, writeToken, aesKey, {

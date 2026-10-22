@@ -57,15 +57,18 @@ CREATE INDEX IF NOT EXISTS idx_messages_channel ON messages(channel_id, id);
 
 // Migración suave: columnas del token de API (bots y otros servicios)
 try { db.exec('ALTER TABLE channels ADD COLUMN api_hash TEXT') } catch (e) { /* ya existe */ }
-try { db.exec('ALTER TABLE channels ADD COLUMN api_key TEXT') } catch (e) { /* ya existe */ }
 try { db.exec("ALTER TABLE channels ADD COLUMN api_paused INTEGER NOT NULL DEFAULT 0") } catch (e) { /* ya existe */ }
+// v1.3: la clave de la API se guarda ENVUELTA (cifrada) con el propio token.
+try { db.exec('ALTER TABLE channels ADD COLUMN api_key_wrapped TEXT') } catch (e) { /* ya existe */ }
+// v1.2 legacy: eliminar la columna de texto claro si aún existe
+try { db.exec('ALTER TABLE channels DROP COLUMN api_key') } catch (e) { /* no existe */ }
 
 const insertChannel = db.prepare(
   'INSERT INTO channels (id, write_hash, read_hash, created_at) VALUES (?, ?, ?, ?)'
 )
 const getChannel = db.prepare('SELECT * FROM channels WHERE id = ?')
 const getChannelByApiHash = db.prepare('SELECT * FROM channels WHERE api_hash = ?')
-const setApiToken = db.prepare('UPDATE channels SET api_hash = ?, api_key = ? WHERE id = ?')
+const setApiToken = db.prepare('UPDATE channels SET api_hash = ?, api_key_wrapped = ? WHERE id = ?')
 const setApiPaused = db.prepare('UPDATE channels SET api_paused = ? WHERE id = ?')
 const insertMessage = db.prepare(
   'INSERT INTO messages (channel_id, iv, ct, algo, time, received_at) VALUES (?, ?, ?, ?, ?, ?)'
@@ -94,6 +97,44 @@ const HEX64_RE = /^[0-9a-f]{64}$/
 /** SHA-256 en hex de los BYTES del token (el token llega en base64url). */
 function tokenHash (token) {
   return crypto.createHash('sha256').update(Buffer.from(token, 'base64url')).digest('hex')
+}
+
+/**
+ * ENVUELVE la clave AES del canal con una clave derivada del TOKEN de API.
+ * La base de datos nunca guarda la clave en texto claro: para desenvolverla
+ * se necesita el token completo (que solo tiene el consumidor). El hash del
+ * token guardado en la DB NO sirve para desenvolver, así una fuga de la
+ * base de datos sola no revela ninguna clave.
+ */
+function wrapKeyForToken (apiToken, keyB64) {
+  const wrapKey = crypto.createHash('sha256')
+    .update(Buffer.from(apiToken, 'base64url'))
+    .update('verificape-wrap-v1')
+    .digest()
+  const iv = crypto.randomBytes(12)
+  const cipher = crypto.createCipheriv('aes-256-gcm', wrapKey, iv)
+  const ct = Buffer.concat([cipher.update(Buffer.from(keyB64, 'utf8')), cipher.final()])
+  const tag = cipher.getAuthTag()
+  return Buffer.concat([iv, ct, tag]).toString('base64url')
+}
+
+/** Desenvuelve la clave con el token de la petición (solo en memoria). */
+function unwrapKeyForToken (apiToken, wrapped) {
+  try {
+    const blob = Buffer.from(wrapped, 'base64url')
+    const iv = blob.subarray(0, 12)
+    const ct = blob.subarray(12, blob.length - 16)
+    const tag = blob.subarray(blob.length - 16)
+    const wrapKey = crypto.createHash('sha256')
+      .update(Buffer.from(apiToken, 'base64url'))
+      .update('verificape-wrap-v1')
+      .digest()
+    const d = crypto.createDecipheriv('aes-256-gcm', wrapKey, iv)
+    d.setAuthTag(tag)
+    return Buffer.concat([d.update(ct), d.final()]).toString('utf8')
+  } catch (e) {
+    return null
+  }
 }
 
 function eqHex (a, b) {
@@ -299,7 +340,7 @@ function authApi (req, res) {
     res.status(403).json({ ok: false, error: 'El token de API está en pausa' })
     return null
   }
-  return channel
+  return { channel, token }
 }
 
 /** Descifra un mensaje con la clave AES del canal (modo API descifrada). */
@@ -338,8 +379,9 @@ app.get('/api/v1/ping', (req, res) => {
 })
 
 app.get('/api/v1/messages', (req, res) => {
-  const channel = authApi(req, res)
-  if (!channel) return
+  const auth = authApi(req, res)
+  if (!auth) return
+  const { channel, token } = auth
 
   let since = Number.parseInt(String(req.query.since || '0'), 10)
   if (!Number.isFinite(since) || since < 0) since = 0
@@ -359,7 +401,9 @@ app.get('/api/v1/messages', (req, res) => {
     where.join(' AND ') + ' ORDER BY id DESC LIMIT ?'
   ).all(...args, limit)
 
-  const keyBuf = channel.api_key ? Buffer.from(channel.api_key, 'base64url') : null
+  // La clave se desenvuelve SOLO en memoria, con el token de esta petición
+  const keyB64 = channel.api_key_wrapped ? unwrapKeyForToken(token, channel.api_key_wrapped) : null
+  const keyBuf = keyB64 ? Buffer.from(keyB64, 'base64url') : null
   const messages = keyBuf ? rows.map(r => decryptRow(keyBuf, r)) : rows
 
   res.json({
@@ -372,8 +416,9 @@ app.get('/api/v1/messages', (req, res) => {
 })
 
 app.get('/api/v1/stats', (req, res) => {
-  const channel = authApi(req, res)
-  if (!channel) return
+  const auth = authApi(req, res)
+  if (!auth) return
+  const { channel } = auth
   const row = db.prepare(
     'SELECT COUNT(*) AS total, MIN(id) AS first_id, MAX(id) AS last_id, ' +
     'MIN(received_at) AS first_at, MAX(received_at) AS last_at ' +
@@ -386,25 +431,33 @@ app.get('/api/v1/stats', (req, res) => {
 app.get('/api/api-token', (req, res) => {
   const channel = authChannel(req, 'read')
   if (!channel) return res.status(401).json({ ok: false, error: 'No autorizado' })
-  res.json({ ok: true, exists: !!channel.api_hash, paused: !!channel.api_paused })
+  res.json({
+    ok: true,
+    exists: !!channel.api_hash,
+    paused: !!channel.api_paused,
+    modo: channel.api_hash ? (channel.api_key_wrapped ? 'descifrado' : 'cifrado') : null
+  })
 })
 
 /**
  * El panel registra el token de API autenticándose con su token de lectura.
- * Desde la v1.2 el panel envía TAMBIÉN la clave AES del canal (opt-in) para
- * que la API pueda entregar los mensajes ya descifrados al consumidor.
+ * La clave AES del canal llega junto con el TOKEN de API y se guarda
+ * ENVUELTA con él (wrapKeyForToken): la DB jamás contiene la clave en
+ * texto claro (ver hallazgo de seguridad v1.3).
  */
 app.post('/api/api-token', (req, res) => {
   const channel = authChannel(req, 'read')
   if (!channel) return res.status(401).json({ ok: false, error: 'No autorizado' })
-  const { apiHash, key } = req.body || {}
-  if (typeof apiHash !== 'string' || !HEX64_RE.test(apiHash)) {
-    return res.status(400).json({ ok: false, error: 'apiHash inválido' })
+  const { apiToken, key } = req.body || {}
+  if (typeof apiToken !== 'string' || !B64U_RE.test(apiToken) || apiToken.length < 20 || apiToken.length > 200) {
+    return res.status(400).json({ ok: false, error: 'apiToken inválido' })
   }
   if (typeof key !== 'string' || !B64U_RE.test(key) || Buffer.from(key, 'base64url').length !== 32) {
     return res.status(400).json({ ok: false, error: 'key inválida (se requiere la clave AES b64url de 32 bytes)' })
   }
-  setApiToken.run(apiHash, key, channel.id)
+  const apiHash = tokenHash(apiToken)
+  const wrapped = wrapKeyForToken(apiToken, key)
+  setApiToken.run(apiHash, wrapped, channel.id)
   setApiPaused.run(0, channel.id)
   res.json({ ok: true })
 })

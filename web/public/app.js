@@ -593,6 +593,20 @@ function apiToken () {
   try { return JSON.parse(localStorage.getItem(LS.api) || 'null') } catch (e) { return null }
 }
 
+/** La clave AES se muestra ENMASCARADA (se revela con 👁). */
+let keyVisible = false
+
+function maskKey (k) {
+  return (k && k.length > 16) ? k.slice(0, 6) + '••••••••••' + k.slice(-4) : k
+}
+
+function renderKey () {
+  const p = state.pair
+  if (!p) return
+  $('#api-key-value').textContent = keyVisible ? p.key : maskKey(p.key)
+  $('#btn-toggle-key').textContent = keyVisible ? '🙈' : '👁'
+}
+
 async function copyText (txt, msg) {
   try {
     await navigator.clipboard.writeText(txt)
@@ -639,9 +653,20 @@ async function renderApiView () {
   $('#btn-api-pause').textContent = saved.paused ? '▶ Reanudar' : '⏸ Pausar'
 
   $('#api-token-value').textContent = saved.token
-  $('#api-key-value').textContent = p.key
+  renderKey()
   $('#api-channel-value').textContent = p.channel
   $('#api-url-value').textContent = serverUrl()
+
+  // Aviso si el token es de la versión anterior (modo cifrado, sin clave envuelta)
+  const modoEl = $('#api-mode-note')
+  if (modoEl) {
+    if (status.modo === 'cifrado') {
+      modoEl.textContent = 'ℹ️ Este token es de una versión anterior (modo cifrado). Revócalo y genera uno nuevo para activar el modo descifrado.'
+      modoEl.classList.remove('hidden')
+    } else {
+      modoEl.classList.add('hidden')
+    }
+  }
 
   const config = { baseUrl: serverUrl(), apiToken: saved.token }
   $('#api-config').textContent = JSON.stringify(config, null, 2)
@@ -657,12 +682,12 @@ async function genApiToken () {
   const p = state.pair
   if (!p) return
   const token = randB64u()
-  const apiHash = await sha256Hex(token)
   const res = await fetch('/api/api-token?channel=' + encodeURIComponent(p.channel) +
     '&token=' + encodeURIComponent(p.read), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ apiHash, key: p.key })   // clave: permite entregar descifrado
+    // El servidor ENVUELVE la clave con el token (nunca la guarda en claro)
+    body: JSON.stringify({ apiToken: token, key: p.key })
   })
   const data = await res.json().catch(() => ({}))
   if (res.ok && data.ok) {
@@ -806,7 +831,8 @@ function bindEvents () {
   $('#btn-api-revoke').onclick = revokeApiToken
   $('#btn-api-pause').onclick = toggleApiPause
   $('#btn-copy-token').onclick = () => copyText($('#api-token-value').textContent, 'Token copiado')
-  $('#btn-copy-key').onclick = () => copyText($('#api-key-value').textContent, 'Clave AES copiada')
+  $('#btn-copy-key').onclick = () => copyText(state.pair.key, 'Clave AES copiada')
+  $('#btn-toggle-key').onclick = () => { keyVisible = !keyVisible; renderKey() }
   $('#btn-copy-config').onclick = () => copyText($('#api-config').textContent, 'Configuración copiada')
   $('#btn-copy-curl').onclick = () => copyText($('#api-example-curl').textContent, 'Comando copiado')
 }

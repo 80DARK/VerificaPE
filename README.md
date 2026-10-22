@@ -155,9 +155,18 @@ El panel trae una sección **API** en el menú lateral donde generas un token
 con un clic, lo **pausas** temporalmente o lo **revocas**.
 
 Desde la v1.2 la API entrega los mensajes **ya descifrados**: el consumidor
-solo necesita el token (el transporte va protegido por HTTPS). Al crear el
-token, el servidor guarda una copia de la clave del canal para poder
-descifrar (el panel sigue siendo E2E; está explicado en la propia UI).
+solo necesita el token (el transporte va protegido por HTTPS).
+
+**Modelo de seguridad (v1.3)**: al crear el token, la clave del canal se
+guarda en el servidor **envuelta** (AES-256-GCM) con una clave derivada del
+**propio token**. La base de datos nunca contiene la clave en texto claro:
+para desenvolverla se necesita el token completo, que solo tiene el
+consumidor — el hash del token almacenado no sirve para eso. Una fuga de la
+base de datos (dump, backup) no revela ninguna clave; la clave se desenvuelve
+solo en memoria, durante cada petición autenticada. El panel sigue siendo E2E
+y muestra la clave **enmascarada** en la UI. Advertencia honesta: un servidor
+*activo y malicioso* podría registrar tokens o respuestas — si tu amenaza
+incluye al propio servidor, no actives la API.
 
 **Endpoints v1** (autenticación con cabecera `X-API-Token`):
 
