@@ -164,9 +164,10 @@ para desenvolverla se necesita el token completo, que solo tiene el
 consumidor — el hash del token almacenado no sirve para eso. Una fuga de la
 base de datos (dump, backup) no revela ninguna clave; la clave se desenvuelve
 solo en memoria, durante cada petición autenticada. El panel sigue siendo E2E
-y muestra la clave **enmascarada** en la UI. Advertencia honesta: un servidor
-*activo y malicioso* podría registrar tokens o respuestas — si tu amenaza
-incluye al propio servidor, no actives la API.
+y la clave AES no se muestra en la sección API (el consumidor solo necesita
+el token). Advertencia honesta: un servidor *activo y malicioso* podría
+registrar tokens o respuestas — si tu amenaza incluye al propio servidor,
+no actives la API.
 
 **Endpoints v1** (autenticación con cabecera `X-API-Token`):
 

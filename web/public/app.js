@@ -587,24 +587,10 @@ function initSidebar () {
   })
 }
 
-/* ─────────────────── API para ComercIA ─────────────────── */
+/* ─────────────────── API de acceso ─────────────────── */
 
 function apiToken () {
   try { return JSON.parse(localStorage.getItem(LS.api) || 'null') } catch (e) { return null }
-}
-
-/** La clave AES se muestra ENMASCARADA (se revela con 👁). */
-let keyVisible = false
-
-function maskKey (k) {
-  return (k && k.length > 16) ? k.slice(0, 6) + '••••••••••' + k.slice(-4) : k
-}
-
-function renderKey () {
-  const p = state.pair
-  if (!p) return
-  $('#api-key-value').textContent = keyVisible ? p.key : maskKey(p.key)
-  $('#btn-toggle-key').textContent = keyVisible ? '🙈' : '👁'
 }
 
 async function copyText (txt, msg) {
@@ -653,7 +639,6 @@ async function renderApiView () {
   $('#btn-api-pause').textContent = saved.paused ? '▶ Reanudar' : '⏸ Pausar'
 
   $('#api-token-value').textContent = saved.token
-  renderKey()
   $('#api-channel-value').textContent = p.channel
   $('#api-url-value').textContent = serverUrl()
 
@@ -831,8 +816,6 @@ function bindEvents () {
   $('#btn-api-revoke').onclick = revokeApiToken
   $('#btn-api-pause').onclick = toggleApiPause
   $('#btn-copy-token').onclick = () => copyText($('#api-token-value').textContent, 'Token copiado')
-  $('#btn-copy-key').onclick = () => copyText(state.pair.key, 'Clave AES copiada')
-  $('#btn-toggle-key').onclick = () => { keyVisible = !keyVisible; renderKey() }
   $('#btn-copy-config').onclick = () => copyText($('#api-config').textContent, 'Configuración copiada')
   $('#btn-copy-curl').onclick = () => copyText($('#api-example-curl').textContent, 'Comando copiado')
 }
