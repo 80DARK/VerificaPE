@@ -70,11 +70,23 @@ interface NotificationLogDao {
 @Dao
 interface PairingDao {
 
-    @Query("SELECT * FROM pairing WHERE id = 1")
-    suspend fun get(): PairingEntity?
+    @Query("SELECT * FROM pairing ORDER BY pairedAt DESC")
+    suspend fun getAll(): List<PairingEntity>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun put(pairing: PairingEntity)
+    @Query("SELECT * FROM pairing WHERE channelId = :channelId")
+    suspend fun getByChannel(channelId: String): PairingEntity?
+
+    @Query("SELECT COUNT(*) FROM pairing")
+    suspend fun count(): Int
+
+    @Insert
+    suspend fun insert(pairing: PairingEntity): Long
+
+    @Query("UPDATE pairing SET serverUrl = :serverUrl, pairedAt = :at WHERE channelId = :channelId")
+    suspend fun updateServer(channelId: String, serverUrl: String, at: Long)
+
+    @Query("DELETE FROM pairing WHERE channelId = :channelId")
+    suspend fun deleteByChannel(channelId: String)
 
     @Query("DELETE FROM pairing")
     suspend fun clear()

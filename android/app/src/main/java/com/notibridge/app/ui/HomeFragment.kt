@@ -81,16 +81,18 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
         viewLifecycleOwner.lifecycleScope.launch {
             val db = AppDatabase.get(appCtx)
             val startOfDay = System.currentTimeMillis() - 24L * 60 * 60 * 1000
-            val pairing = db.pairing().get()
+            val channelCount = db.pairing().count()
             val today = db.logs().countSince(startOfDay)
             val sent = db.logs().countSent()
             val otp = db.logs().countIgnored()
             val recent = db.logs().recent(5)
             withContext(Dispatchers.Main) {
                 if (!isAdded) return@withContext
-                pairStatus.text = pairing?.let {
-                    getString(R.string.paired_with, it.serverUrl)
-                } ?: getString(R.string.not_paired)
+                pairStatus.text = if (channelCount > 0) {
+                    getString(R.string.paired_channels, channelCount)
+                } else {
+                    getString(R.string.not_paired)
+                }
                 statToday.text = today.toString()
                 statSent.text = sent.toString()
                 statOtp.text = otp.toString()

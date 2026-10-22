@@ -2,7 +2,6 @@
 # Sube este repositorio a GitHub con confianza: los secretos y
 # binarios generados quedan fuera del control de versiones.
 
-# Android · builds y secretos de firma
 android/.gradle/
 android/build/
 android/app/build/

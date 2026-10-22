@@ -55,15 +55,18 @@ CREATE TABLE IF NOT EXISTS messages (
 CREATE INDEX IF NOT EXISTS idx_messages_channel ON messages(channel_id, id);
 `)
 
-// Migración suave: columna del token de API (ComercIA y otros bots)
+// Migración suave: columnas del token de API (bots y otros servicios)
 try { db.exec('ALTER TABLE channels ADD COLUMN api_hash TEXT') } catch (e) { /* ya existe */ }
+try { db.exec('ALTER TABLE channels ADD COLUMN api_key TEXT') } catch (e) { /* ya existe */ }
+try { db.exec("ALTER TABLE channels ADD COLUMN api_paused INTEGER NOT NULL DEFAULT 0") } catch (e) { /* ya existe */ }
 
 const insertChannel = db.prepare(
   'INSERT INTO channels (id, write_hash, read_hash, created_at) VALUES (?, ?, ?, ?)'
 )
 const getChannel = db.prepare('SELECT * FROM channels WHERE id = ?')
 const getChannelByApiHash = db.prepare('SELECT * FROM channels WHERE api_hash = ?')
-const setApiHash = db.prepare('UPDATE channels SET api_hash = ? WHERE id = ?')
+const setApiToken = db.prepare('UPDATE channels SET api_hash = ?, api_key = ? WHERE id = ?')
+const setApiPaused = db.prepare('UPDATE channels SET api_paused = ? WHERE id = ?')
 const insertMessage = db.prepare(
   'INSERT INTO messages (channel_id, iv, ct, algo, time, received_at) VALUES (?, ?, ?, ?, ?, ?)'
 )
@@ -277,23 +280,50 @@ app.get('/api/stream', (req, res) => {
 })
 
 /**
- * Autentica una petición de la API v1 (bots como ComercIA) con el token
- * de API: el token por sí solo identifica el canal (el servidor solo
- * guarda su hash SHA-256).
+ * Autentica una petición de la API v1 (bots y otros servicios) con el token
+ * de API: el token por sí solo identifica el canal (el servidor solo guarda
+ * su hash SHA-256). Responde 401/403 directamente si falla.
  */
-function authApi (req) {
+function authApi (req, res) {
   const token = req.get('x-api-token') || req.query.token
-  if (typeof token !== 'string' || !B64U_RE.test(token) || token.length > 200) return null
+  if (typeof token !== 'string' || !B64U_RE.test(token) || token.length > 200) {
+    res.status(401).json({ ok: false, error: 'Token de API inválido' })
+    return null
+  }
   const channel = getChannelByApiHash.get(tokenHash(token))
-  return channel || null
+  if (!channel) {
+    res.status(401).json({ ok: false, error: 'Token de API inválido o revocado' })
+    return null
+  }
+  if (channel.api_paused) {
+    res.status(403).json({ ok: false, error: 'El token de API está en pausa' })
+    return null
+  }
+  return channel
+}
+
+/** Descifra un mensaje con la clave AES del canal (modo API descifrada). */
+function decryptRow (keyBuf, m) {
+  try {
+    const iv = Buffer.from(m.iv, 'base64url')
+    const blob = Buffer.from(m.ct, 'base64url')
+    const d = crypto.createDecipheriv('aes-256-gcm', keyBuf, iv)
+    d.setAuthTag(blob.subarray(blob.length - 16))
+    const plain = JSON.parse(
+      Buffer.concat([d.update(blob.subarray(0, blob.length - 16)), d.final()]).toString('utf8')
+    )
+    return { id: m.id, recibidoEn: m.received_at, ilegible: false, ...plain }
+  } catch (e) {
+    return { id: m.id, recibidoEn: m.received_at, ilegible: true }
+  }
 }
 
 // ---------------------------------------------------------------------------
-// API v1 · para ComercIA (bot WhatsApp) y otros servicios
-// El servidor sigue siendo zero-knowledge: entrega los mensajes CIFRADOS
-// y el bot los descifra localmente con la clave AES. Los filtros de
-// fecha/limite corren aquí; los de texto (palabra, nombre, monto, app)
-// corren en el bot (ver cliente-verificape.js).
+// API v1 · para bots y otros servicios
+// La API entrega los mensajes YA DESCIFRADOS (opt-in al crear el token:
+// el panel manda la clave del canal junto con el hash del token). El
+// transporte está protegido por HTTPS. Los filtros de fecha/límite corren
+// aquí; los de texto (palabra, nombre, monto, app) en el cliente de Node.
 // ---------------------------------------------------------------------------
 app.use('/api/v1', (req, res, next) => {
   res.set('Access-Control-Allow-Origin', '*')
@@ -308,8 +338,8 @@ app.get('/api/v1/ping', (req, res) => {
 })
 
 app.get('/api/v1/messages', (req, res) => {
-  const channel = authApi(req)
-  if (!channel) return res.status(401).json({ ok: false, error: 'Token de API inválido' })
+  const channel = authApi(req, res)
+  if (!channel) return
 
   let since = Number.parseInt(String(req.query.since || '0'), 10)
   if (!Number.isFinite(since) || since < 0) since = 0
@@ -329,17 +359,21 @@ app.get('/api/v1/messages', (req, res) => {
     where.join(' AND ') + ' ORDER BY id DESC LIMIT ?'
   ).all(...args, limit)
 
+  const keyBuf = channel.api_key ? Buffer.from(channel.api_key, 'base64url') : null
+  const messages = keyBuf ? rows.map(r => decryptRow(keyBuf, r)) : rows
+
   res.json({
     ok: true,
     total: countMessages.get(channel.id).n,
-    messages: rows,
+    messages,
+    modo: keyBuf ? 'descifrado' : 'cifrado',
     filtros: { since, from: Number.isFinite(from) ? from : null, to: Number.isFinite(to) ? to : null, limit }
   })
 })
 
 app.get('/api/v1/stats', (req, res) => {
-  const channel = authApi(req)
-  if (!channel) return res.status(401).json({ ok: false, error: 'Token de API inválido' })
+  const channel = authApi(req, res)
+  if (!channel) return
   const row = db.prepare(
     'SELECT COUNT(*) AS total, MIN(id) AS first_id, MAX(id) AS last_id, ' +
     'MIN(received_at) AS first_at, MAX(received_at) AS last_at ' +
@@ -348,22 +382,53 @@ app.get('/api/v1/stats', (req, res) => {
   res.json({ ok: true, total: row.total, first_id: row.first_id, last_id: row.last_id, first_at: row.first_at, last_at: row.last_at })
 })
 
-/** El panel registra (o revoca) el token de API con su token de lectura. */
+/** El panel consulta el estado del token de API. */
+app.get('/api/api-token', (req, res) => {
+  const channel = authChannel(req, 'read')
+  if (!channel) return res.status(401).json({ ok: false, error: 'No autorizado' })
+  res.json({ ok: true, exists: !!channel.api_hash, paused: !!channel.api_paused })
+})
+
+/**
+ * El panel registra el token de API autenticándose con su token de lectura.
+ * Desde la v1.2 el panel envía TAMBIÉN la clave AES del canal (opt-in) para
+ * que la API pueda entregar los mensajes ya descifrados al consumidor.
+ */
 app.post('/api/api-token', (req, res) => {
   const channel = authChannel(req, 'read')
   if (!channel) return res.status(401).json({ ok: false, error: 'No autorizado' })
-  const { apiHash } = req.body || {}
+  const { apiHash, key } = req.body || {}
   if (typeof apiHash !== 'string' || !HEX64_RE.test(apiHash)) {
     return res.status(400).json({ ok: false, error: 'apiHash inválido' })
   }
-  setApiHash.run(apiHash, channel.id)
+  if (typeof key !== 'string' || !B64U_RE.test(key) || Buffer.from(key, 'base64url').length !== 32) {
+    return res.status(400).json({ ok: false, error: 'key inválida (se requiere la clave AES b64url de 32 bytes)' })
+  }
+  setApiToken.run(apiHash, key, channel.id)
+  setApiPaused.run(0, channel.id)
   res.json({ ok: true })
 })
 
+/** Pausar / reanudar el token de API (el consumidor recibe 403 mientras esté en pausa). */
+app.post('/api/api-token/pause', (req, res) => {
+  const channel = authChannel(req, 'read')
+  if (!channel) return res.status(401).json({ ok: false, error: 'No autorizado' })
+  setApiPaused.run(1, channel.id)
+  res.json({ ok: true, paused: true })
+})
+
+app.post('/api/api-token/resume', (req, res) => {
+  const channel = authChannel(req, 'read')
+  if (!channel) return res.status(401).json({ ok: false, error: 'No autorizado' })
+  setApiPaused.run(0, channel.id)
+  res.json({ ok: true, paused: false })
+})
+
+/** Revocar el token de API (también borra la clave guardada). */
 app.delete('/api/api-token', (req, res) => {
   const channel = authChannel(req, 'read')
   if (!channel) return res.status(401).json({ ok: false, error: 'No autorizado' })
-  setApiHash.run(null, channel.id)
+  setApiToken.run(null, null, channel.id)
   res.json({ ok: true })
 })
 

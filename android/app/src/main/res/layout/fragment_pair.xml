@@ -12,7 +12,7 @@
         android:orientation="vertical"
         android:padding="16dp">
 
-        <!-- Estado del emparejamiento -->
+        <!-- Canales emparejados (puede haber VARIOS: multi-QR) -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -26,19 +26,27 @@
                 android:orientation="vertical">
 
                 <TextView
-                    android:id="@+id/pair_status"
+                    android:id="@+id/pairings_title"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/not_paired"
+                    android:text="@string/pairings_title"
                     android:textAppearance="?attr/textAppearanceTitleMedium" />
 
                 <TextView
-                    android:id="@+id/pair_details"
-                    android:layout_width="wrap_content"
+                    android:id="@+id/pair_empty"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="6dp"
-                    android:textSize="12sp"
-                    android:text="@string/not_paired_help" />
+                    android:text="@string/pair_empty"
+                    android:textSize="13sp"
+                    android:textColor="@color/text_secondary" />
+
+                <LinearLayout
+                    android:id="@+id/pairings_container"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:layout_marginTop="4dp" />
 
                 <Button
                     android:id="@+id/btn_scan"
@@ -46,21 +54,6 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
                     android:text="@string/btn_scan" />
-
-                <Button
-                    android:id="@+id/btn_send_test"
-                    style="?attr/borderlessButtonStyle"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="@string/btn_send_test" />
-
-                <Button
-                    android:id="@+id/btn_unpair"
-                    style="?attr/borderlessButtonStyle"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="@string/btn_unpair"
-                    android:textColor="@color/badge_otp" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 

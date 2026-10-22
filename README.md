@@ -37,13 +37,14 @@ VerificaPE son dos piezas que trabajan juntas:
 | Ver **apps instaladas** y activar/desactivar cada una | Sección «Apps monitoreadas» con interruptor por app |
 | **Todo desactivado por defecto** | Cada app nueva entra con `enabled = false` |
 | **Emparejar escaneando un QR** | La web genera el QR; la app lo escanea (o pegas el código) |
+| **Varios QR a la vez** (multi-canal) | Escanea todos los paneles que quieras: cada notificación se envía cifrada a TODOS |
 | **Cifrado extremo a extremo** | AES-256-GCM; la clave solo viaja en el QR; el servidor solo ve ciphertext |
 | **Menú lateral izquierdo, vertical y retráctil** | App: `DrawerLayout` + `NavigationView` · Web: sidebar colapsable |
 | ⚡ **Latencia < 1 segundo** | Push en vivo por **SSE** (test real: 7–15 ms) + sondeo de respaldo |
 | 🔔 **Sonido de notificación** | Campanilla «di-ding» al llegar un pago (activable, con botón de prueba) |
 | 🐳 **Docker** | `Dockerfile` + `docker compose` (con túnel opcional incluido) |
 | 🌐 **Túnel gratuito Cloudflare** | `start.ps1` / perfil `tunnel` del compose |
-| 🔌 **API para bots (ComercIA)** | Sección «API» con token propio + `cliente-verificape.js` con filtros (palabra, nombre, monto, fecha, app) |
+| 🔌 **API de acceso** | Sección «API»: token con pausa/revocación + `cliente-verificape.js` con filtros (palabra, nombre, monto, fecha, app) |
 
 ## 🚀 Puesta en marcha
 
@@ -134,32 +135,35 @@ node test-e2e.js     # 12 pruebas: cifrado, webhook, push SSE (<1 s), borrados�
   elimínalo si el servidor va tras HTTPS.
 - Mensajes: hasta 5 000 por canal en el servidor (recorte automático).
 
-## 🔌 API para ComercIA (bots)
+## 🔌 API de acceso (bots y servicios)
 
-El panel trae una sección **API (ComercIA)** en el menú lateral donde generas
-( y revocas) un **token de API** con un clic. El bot consulta y **descifra
-localmente** con la clave AES — el servidor sigue sin ver nada (E2E).
+El panel trae una sección **API** en el menú lateral donde generas un token
+con un clic, lo **pausas** temporalmente o lo **revocas**.
+
+Desde la v1.2 la API entrega los mensajes **ya descifrados**: el consumidor
+solo necesita el token (el transporte va protegido por HTTPS). Al crear el
+token, el servidor guarda una copia de la clave del canal para poder
+descifrar (el panel sigue siendo E2E; está explicado en la propia UI).
 
 **Endpoints v1** (autenticación con cabecera `X-API-Token`):
 
 ```
 GET /api/v1/ping                                 → estado del servicio
-GET /api/v1/messages?since=&from=&to=&limit=    → mensajes CIFRADOS (fecha en ms)
+GET /api/v1/messages?since=&from=&to=&limit=    → mensajes DESCIFRADOS (fecha en ms)
 GET /api/v1/stats                                → total, ids y fechas extremas
+Token en pausa → 403 · Token inválido o revocado → 401
 ```
 
 Filtros de **fecha/rango/límite** corren en el servidor. Los de texto
-(**palabra clave, nombre, monto, app**) corren en tu bot tras descifrar, con
-la librería lista para usar `web/cliente-verificape.js` (Node 18+, sin
-dependencias):
+(**palabra clave, nombre, monto, app**) están listos en la librería
+`web/cliente-verificape.js` (Node 18+, sin dependencias, solo token):
 
 ```js
 const { VerificaPE } = require('./cliente-verificape')
 
 const vpe = new VerificaPE({
   baseUrl:  'https://tu-servidor.com',   // copia del panel, sección API
-  apiToken: 'xxxx',                       // token de API
-  aesKey:   'xxxx'                        // clave AES (E2E)
+  apiToken: 'xxxx'                        // token de API
 })
 
 // ¿Llegó el Yape de S/ 25 de María hoy?
@@ -169,7 +173,7 @@ const ultimo = await vpe.ultimo()          // la notificación más reciente
 
 Filtros disponibles: `q` (palabra clave), `nombre`, `monto` (S/), `fecha`
 (día), `app`, `desde`, `hasta`, `desdeId`, `limite` — combinables entre sí.
-Prueba todo con `npm run test:api` (23 verificaciones).
+Prueba todo con `npm run test:api` (26 verificaciones).
 
 ## 📦 Publicar en GitHub
 

@@ -4,24 +4,27 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.view.LayoutInflater
 import android.view.View
 import android.widget.Button
 import android.widget.EditText
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
+import com.google.android.material.card.MaterialCardView
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
-import com.notibridge.app.db.AppDatabase
 import com.notibridge.app.PairingInfo
 import com.notibridge.app.PairingParser
 import com.notibridge.app.R
 import com.notibridge.app.SecureStore
 import com.notibridge.app.Sender
 import com.notibridge.app.WebhookClient
+import com.notibridge.app.db.AppDatabase
 import com.notibridge.app.db.PairingEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -29,16 +32,15 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 /**
- * Emparejamiento con la web escaneando el código QR (o pegando el código
- * manualmente). La clave AES y el token viajan DENTRO del QR, nunca por el
- * servidor: eso es lo que hace que el canal sea de extremo a extremo.
+ * Emparejamiento con la web: se pueden conectar VARIOS paneles (multi-QR).
+ * Cada notificación se envía cifrada a TODOS los canales emparejados.
+ * El escáner funciona en VERTICAL (sigue la rotación del teléfono).
  */
 class PairFragment : Fragment(R.layout.fragment_pair) {
 
-    private lateinit var statusText: TextView
-    private lateinit var detailsText: TextView
-    private lateinit var btnTest: Button
-    private lateinit var btnUnpair: Button
+    private lateinit var pairingsTitle: TextView
+    private lateinit var pairEmpty: TextView
+    private lateinit var pairingsContainer: LinearLayout
 
     private val scanLauncher = registerForActivityResult(ScanContract()) { result ->
         result.contents?.let(::onCodeScanned)
@@ -51,10 +53,9 @@ class PairFragment : Fragment(R.layout.fragment_pair) {
         }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        statusText = view.findViewById(R.id.pair_status)
-        detailsText = view.findViewById(R.id.pair_details)
-        btnTest = view.findViewById(R.id.btn_send_test)
-        btnUnpair = view.findViewById(R.id.btn_unpair)
+        pairingsTitle = view.findViewById(R.id.pairings_title)
+        pairEmpty = view.findViewById(R.id.pair_empty)
+        pairingsContainer = view.findViewById(R.id.pairings_container)
 
         view.findViewById<Button>(R.id.btn_scan).setOnClickListener {
             if (ContextCompat.checkSelfPermission(
@@ -64,15 +65,17 @@ class PairFragment : Fragment(R.layout.fragment_pair) {
             else cameraPermission.launch(Manifest.permission.CAMERA)
         }
 
-        btnTest.setOnClickListener { sendTest() }
-        btnUnpair.setOnClickListener { unpair() }
-
         view.findViewById<Button>(R.id.btn_manual).setOnClickListener {
             val raw = view.findViewById<EditText>(R.id.edit_manual).text?.toString().orEmpty()
             if (raw.isNotBlank()) onCodeScanned(raw)
         }
 
-        updateUi()
+        reload()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        reload()
     }
 
     private fun startScan() {
@@ -80,7 +83,7 @@ class PairFragment : Fragment(R.layout.fragment_pair) {
             setDesiredBarcodeFormats("QR_CODE")
             setPrompt(getString(R.string.scan_prompt))
             setBeepEnabled(false)
-            setOrientationLocked(true)
+            setOrientationLocked(false)   // escaneo en VERTICAL/libre
         }
         scanLauncher.launch(options)
     }
@@ -96,40 +99,84 @@ class PairFragment : Fragment(R.layout.fragment_pair) {
 
     private fun connect(info: PairingInfo) {
         val appCtx = requireContext().applicationContext
-        viewLifecycleOwner.lifecycleScope.launch {
-            AppDatabase.get(appCtx).pairing().put(
-                PairingEntity(
-                    serverUrl = info.serverUrl,
-                    channelId = info.channelId,
-                    pairedAt = System.currentTimeMillis()
+        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
+            val db = AppDatabase.get(appCtx)
+            val existing = db.pairing().getByChannel(info.channelId)
+            if (existing != null) {
+                db.pairing().updateServer(info.channelId, info.serverUrl, System.currentTimeMillis())
+            } else {
+                db.pairing().insert(
+                    PairingEntity(
+                        serverUrl = info.serverUrl,
+                        channelId = info.channelId,
+                        pairedAt = System.currentTimeMillis()
+                    )
                 )
-            )
-            SecureStore.savePairing(appCtx, info.keyB64, info.writeTokenB64)
+            }
+            SecureStore.savePairing(appCtx, info.channelId, info.keyB64, info.writeTokenB64)
             val reachable = WebhookClient.ping(info.serverUrl)
-            if (isAdded) {
+            withContext(Dispatchers.Main) {
+                if (!isAdded) return@withContext
                 Toast.makeText(
                     requireContext(),
-                    if (reachable) R.string.pair_ok else R.string.pair_warn,
+                    if (existing != null) R.string.pair_updated else R.string.pair_ok,
                     Toast.LENGTH_LONG
                 ).show()
-                updateUi()
+                if (!reachable) {
+                    Toast.makeText(requireContext(), R.string.pair_warn, Toast.LENGTH_LONG).show()
+                }
+                reload()
             }
         }
     }
 
-    private fun sendTest() {
+    private fun reload() {
+        val appCtx = context?.applicationContext ?: return
+        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
+            val list = AppDatabase.get(appCtx).pairing().getAll()
+            withContext(Dispatchers.Main) {
+                if (!isAdded) return@withContext
+                renderList(list)
+            }
+        }
+    }
+
+    private fun renderList(list: List<PairingEntity>) {
+        pairingsTitle.text = getString(R.string.pairings_count, list.size)
+        pairEmpty.visibility = if (list.isEmpty()) View.VISIBLE else View.GONE
+        pairingsContainer.removeAllViews()
+
+        for (pairing in list) {
+            val item = LayoutInflater.from(requireContext())
+                .inflate(R.layout.item_pairing, pairingsContainer, false) as MaterialCardView
+
+            item.findViewById<TextView>(R.id.pair_server).text = pairing.serverUrl
+            item.findViewById<TextView>(R.id.pair_channel).text =
+                getString(R.string.pair_channel_fmt, pairing.channelId)
+
+            item.findViewById<Button>(R.id.btn_pair_test).setOnClickListener {
+                sendTest(pairing.channelId)
+            }
+            item.findViewById<Button>(R.id.btn_pair_delete).setOnClickListener {
+                deletePairing(pairing.channelId)
+            }
+            pairingsContainer.addView(item)
+        }
+    }
+
+    private fun sendTest(channelId: String) {
         val appCtx = requireContext().applicationContext
         viewLifecycleOwner.lifecycleScope.launch {
             val payload = JSONObject().apply {
                 put("v", 1)
                 put("type", "test")
                 put("device", Build.MODEL)
-                put("app", "NotiBridge")
+                put("app", "VerificaPE")
                 put("title", getString(R.string.test_title))
                 put("text", getString(R.string.test_text))
                 put("time", System.currentTimeMillis())
             }
-            val ok = Sender.send(appCtx, payload)
+            val ok = Sender.sendTo(appCtx, channelId, payload)
             if (isAdded) {
                 Toast.makeText(
                     requireContext(),
@@ -140,39 +187,15 @@ class PairFragment : Fragment(R.layout.fragment_pair) {
         }
     }
 
-    private fun unpair() {
+    private fun deletePairing(channelId: String) {
         val appCtx = requireContext().applicationContext
-        viewLifecycleOwner.lifecycleScope.launch {
-            AppDatabase.get(appCtx).pairing().clear()
-            SecureStore.clear(appCtx)
-            if (isAdded) {
-                Toast.makeText(requireContext(), R.string.unpaired, Toast.LENGTH_SHORT).show()
-                updateUi()
-            }
-        }
-    }
-
-    private fun updateUi() {
-        val appCtx = context?.applicationContext ?: return
         viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
-            val pairing = AppDatabase.get(appCtx).pairing().get()
+            AppDatabase.get(appCtx).pairing().deleteByChannel(channelId)
+            SecureStore.removePairing(appCtx, channelId)
             withContext(Dispatchers.Main) {
                 if (!isAdded) return@withContext
-                if (pairing != null) {
-                    statusText.text = getString(R.string.paired)
-                    detailsText.text = getString(
-                        R.string.pair_details,
-                        pairing.serverUrl,
-                        pairing.channelId
-                    )
-                    btnTest.visibility = View.VISIBLE
-                    btnUnpair.visibility = View.VISIBLE
-                } else {
-                    statusText.text = getString(R.string.not_paired)
-                    detailsText.text = getString(R.string.not_paired_help)
-                    btnTest.visibility = View.GONE
-                    btnUnpair.visibility = View.GONE
-                }
+                Toast.makeText(requireContext(), R.string.pair_removed, Toast.LENGTH_SHORT).show()
+                reload()
             }
         }
     }

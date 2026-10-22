@@ -21,6 +21,7 @@
     <string name="not_paired">✖ Sin emparejar</string>
     <string name="not_paired_help">Escanea el código QR que genera la página web (menú → Emparejar).</string>
     <string name="paired_with">✔ Emparejado con %s</string>
+    <string name="paired_channels">✔ Emparejado: %d canal(es)</string>
     <string name="btn_go_pair">Emparejar ahora</string>
     <string name="stat_today_label">Últimas 24 h</string>
     <string name="stat_sent_label">Enviadas a la web</string>
@@ -38,22 +39,28 @@
     <!-- Emparejar -->
     <string name="scan_prompt">Encuadra el código QR de la web</string>
     <string name="btn_scan">Escanear código QR</string>
-    <string name="invalid_qr">Ese código no es un emparejamiento de NotiBridge</string>
+    <string name="invalid_qr">Ese código no es un emparejamiento de VerificaPE</string>
     <string name="pair_ok">Emparejado correctamente ✔</string>
+    <string name="pair_updated">Canal actualizado ✔</string>
     <string name="pair_warn">Guardado, pero el servidor no respondió al ping. ¿Está encendida la web?</string>
     <string name="camera_needed">Sin permiso de cámara no se puede escanear el QR. Puedes pegar el código manualmente.</string>
-    <string name="btn_send_test">Enviar notificación de prueba</string>
     <string name="test_title">Mensaje de prueba</string>
     <string name="test_text">Si lees esto en la web, el canal cifrado funciona ✔</string>
     <string name="test_ok">Prueba enviada ✔ mira la web</string>
     <string name="test_fail">No se pudo enviar la prueba (revisa servidor/QR)</string>
-    <string name="btn_unpair">Desemparejar</string>
     <string name="unpaired">Desemparejado</string>
+    <string name="pairings_title">Canales emparejados</string>
+    <string name="pairings_count">Canales emparejados: %d</string>
+    <string name="pair_empty">Sin canales todavía. Escanea el QR de cada panel que quieras alimentar: cada notificación se enviará cifrada a TODOS los canales que agregues.</string>
+    <string name="pair_channel_fmt">Canal: %s</string>
+    <string name="btn_pair_test">Probar</string>
+    <string name="btn_pair_delete">Eliminar</string>
+    <string name="pair_removed">Emparejamiento eliminado</string>
     <string name="manual_pair_title">¿No puedes escanear?</string>
     <string name="manual_pair_help">Pega aquí el código de emparejamiento (notibridge://pair?…):</string>
     <string name="btn_manual">Conectar manualmente</string>
     <string name="pair_details">Servidor: %1$s\nCanal: %2$s</string>
-    <string name="pair_security_note">La clave de cifrado viaja solo dentro del QR: el servidor nunca la ve (extremo a extremo).</string>
+    <string name="pair_security_note">La clave de cifrado viaja solo dentro de cada QR: el servidor nunca la ve (extremo a extremo).</string>
 
     <!-- Historial -->
     <string name="search_history">Buscar en el historial…</string>

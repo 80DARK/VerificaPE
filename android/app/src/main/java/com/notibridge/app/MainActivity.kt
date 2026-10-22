@@ -5,13 +5,17 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.navigation.NavigationView
+import com.notibridge.app.db.AppDatabase
 import com.notibridge.app.ui.AppsFragment
 import com.notibridge.app.ui.HomeFragment
 import com.notibridge.app.ui.HistoryFragment
 import com.notibridge.app.ui.PairFragment
 import com.notibridge.app.ui.SettingsFragment
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 /**
  * Actividad principal con el MENÚ LATERAL IZQUIERDO VERTICAL Y RETRÁCTIL
@@ -39,6 +43,14 @@ class MainActivity : AppCompatActivity() {
             navigateTo(item.itemId)
             drawer.closeDrawer(GravityCompat.START)
             true
+        }
+
+        // Migración v1.x → v1.2: convierte el emparejamiento único antiguo
+        // al formato multi-canal sin perderlo.
+        lifecycleScope.launch(Dispatchers.IO) {
+            val db = AppDatabase.get(applicationContext)
+            val legacy = db.pairing().getAll().firstOrNull()
+            SecureStore.migrateLegacy(applicationContext, legacy?.channelId)
         }
 
         if (savedInstanceState == null) navigateTo(R.id.nav_home)

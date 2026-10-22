@@ -1,6 +1,7 @@
 package com.notibridge.app.db
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
 /** Una app instalada en el dispositivo y si se monitorean o no sus notificaciones. */
@@ -27,10 +28,13 @@ data class NotificationLogEntity(
     val sentAt: Long? = null
 )
 
-/** Datos del emparejamiento actual con la web (solo 1 fila, id = 1). */
-@Entity(tableName = "pairing")
+/** Un emparejamiento con un panel web. Puede haber VARIOS (multi-QR). */
+@Entity(
+    tableName = "pairing",
+    indices = [Index(value = ["channelId"], unique = true)]
+)
 data class PairingEntity(
-    @PrimaryKey val id: Long = 1L,
+    @PrimaryKey(autoGenerate = true) val id: Long = 0L,
     val serverUrl: String,
     val channelId: String,
     val pairedAt: Long

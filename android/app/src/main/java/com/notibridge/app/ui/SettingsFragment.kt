@@ -60,7 +60,7 @@ class SettingsFragment : Fragment(R.layout.fragment_settings) {
             val appCtx = requireContext().applicationContext
             viewLifecycleOwner.lifecycleScope.launch {
                 db.pairing().clear()
-                SecureStore.clear(appCtx)
+                SecureStore.clearAllPairings(appCtx)
                 if (isAdded) {
                     Toast.makeText(requireContext(), R.string.unpaired, Toast.LENGTH_SHORT).show()
                 }

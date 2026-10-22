@@ -1,45 +1,56 @@
 'use strict'
 
 /* ══════════════════════════════════════════════════════════════════
-   VerificaPE · Cliente para bots (ComercIA y otros)
+   VerificaPE · Cliente para bots y servicios (Node 18+, sin deps)
    ══════════════════════════════════════════════════════════════════
-   Copia este archivo a tu proyecto (Node 18+, sin dependencias) y:
+   Copia este archivo a tu proyecto y:
 
      const { VerificaPE } = require('./cliente-verificape')
 
      const vpe = new VerificaPE({
        baseUrl:  'https://tu-servidor.com',   // donde corre el panel
-       apiToken: '...',                        // Panel web → sección API
-       aesKey:   '...'                         // clave AES del QR (b64url)
+       apiToken: '...'                        // Panel web → sección API
      })
 
      // ¿Llegó el pago de 25 soles de María hoy?
      const pagos = await vpe.mensajes({ monto: 25, nombre: 'Maria' })
+     const ultimo = await vpe.ultimo()        // { id, app, title, text, ... }
 
-     const ultimo = await vpe.ultimo()          // { id, app, title, text, ... }
+   Desde la v1.2 la API entrega los mensajes YA DESCIFRADOS y solo
+   necesitas el token (el transporte va protegido por HTTPS). La clave
+   AES es OPCIONAL y solo se usa si el servidor entrega ciphertext
+   (modo cifrado, por compatibilidad).
 
-   El servidor nunca ve el contenido: entrega los mensajes CIFRADOS y
-   este cliente los descifra y filtra AQUÍ, en tu bot. Filtros soportados:
-   q (palabra clave), nombre, monto (S/), fecha (día), app, desde, hasta,
-   desdeId, limite.
+   Filtros soportados en mensajes():
+   q (palabra clave), nombre, monto (S/), fecha (día), app,
+   desde, hasta, desdeId, limite.
    ══════════════════════════════════════════════════════════════════ */
 
 const crypto = require('crypto')
 
 class VerificaPE {
+  /**
+   * @param {object} cfg
+   *   baseUrl  URL del servidor (obligatorio)
+   *   apiToken token de API del panel (obligatorio)
+   *   aesKey   clave AES b64url (OPCIONAL desde v1.2; solo para modo cifrado)
+   */
   constructor ({ baseUrl, apiToken, aesKey }) {
-    if (!baseUrl || !apiToken || !aesKey) {
-      throw new Error('VerificaPE: faltan baseUrl, apiToken o aesKey')
+    if (!baseUrl || !apiToken) {
+      throw new Error('VerificaPE: faltan baseUrl o apiToken')
     }
     this.baseUrl = baseUrl.replace(/\/+$/, '')
     this.apiToken = apiToken
-    this.key = Buffer.from(aesKey, 'base64url')
-    if (this.key.length !== 32) {
-      throw new Error('VerificaPE: aesKey debe ser base64url de 32 bytes (la del QR)')
+    this.key = null
+    if (aesKey) {
+      this.key = Buffer.from(aesKey, 'base64url')
+      if (this.key.length !== 32) {
+        throw new Error('VerificaPE: aesKey debe ser base64url de 32 bytes')
+      }
     }
   }
 
-  /** Descifra un mensaje del servidor (AES-256-GCM, ct||tag). */
+  /** Descifra un mensaje cifrado (modo compatibilidad). */
   _decrypt (m) {
     const iv = Buffer.from(m.iv, 'base64url')
     const blob = Buffer.from(m.ct, 'base64url')
@@ -50,7 +61,7 @@ class VerificaPE {
     )
   }
 
-  /** Descarga (y descifra) mensajes con filtros de SERVIDOR: fechas e ids. */
+  /** Descarga mensajes con filtros de SERVIDOR (fechas, ids, límite). */
   async _fetch ({ desde, hasta, desdeId, limite } = {}) {
     const q = new URLSearchParams()
     if (desdeId !== undefined) q.set('since', String(desdeId))
@@ -61,16 +72,22 @@ class VerificaPE {
       headers: { 'X-API-Token': this.apiToken }
     })
     const data = await res.json()
+    if (res.status === 403) throw new Error('VerificaPE: el token está en pausa')
     if (!res.ok || !data.ok) {
       throw new Error('VerificaPE API: HTTP ' + res.status + ' ' + JSON.stringify(data))
     }
     return data.messages.map(m => {
-      try {
-        const plain = this._decrypt(m)
-        return { id: m.id, recibidoEn: m.received_at, ilegible: false, ...plain }
-      } catch (e) {
-        return { id: m.id, recibidoEn: m.received_at, ilegible: true }
+      // Modo descifrado (v1.2): el servidor ya entrega el contenido
+      if (m.iv && m.ct && this.key) {
+        try {
+          return { id: m.id, recibidoEn: m.received_at, ilegible: false, ...this._decrypt(m) }
+        } catch (e) {
+          return { id: m.id, recibidoEn: m.received_at, ilegible: true }
+        }
       }
+      return m.ilegible === false || m.ilegible === true
+        ? m
+        : { id: m.id, recibidoEn: m.received_at, ilegible: true }
     })
   }
 

@@ -60,15 +60,17 @@ async function main () {
   check('registro del canal', reg.ok === true)
 
   // ── Registrar el token de API (como lo hace el panel) ─────────────
+  // Desde la v1.2 el panel envía también la clave AES: la API entrega
+  // los mensajes ya DESCIFRADOS y el consumidor solo necesita el token.
   const apiReg = await fetch(
     `${BASE}/api/api-token?channel=${encodeURIComponent(channelId)}&token=${encodeURIComponent(b64url(readToken))}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ apiHash: sha256Hex(apiToken) })
+      body: JSON.stringify({ apiHash: sha256Hex(apiToken), key: b64url(aesKey) })
     }
   ).then(r => r.json())
-  check('registro del token de API', apiReg.ok === true)
+  check('registro del token de API (con clave para modo descifrado)', apiReg.ok === true)
 
   // ── Enviar 3 pagos de prueba (como la app Android) ────────────────
   await postNotif(channelId, writeToken, aesKey, {
@@ -95,7 +97,10 @@ async function main () {
   const msgs = await fetch(BASE + '/api/v1/messages', {
     headers: { 'X-API-Token': b64url(apiToken) }
   }).then(r => r.json())
-  check('la API entrega los 3 mensajes cifrados', msgs.ok === true && msgs.messages.length === 3)
+  check('la API entrega los 3 mensajes ya DESCIFRADOS',
+    msgs.ok === true && msgs.messages.length === 3 && msgs.modo === 'descifrado')
+  check('el contenido descifrado es legible',
+    msgs.messages.some(m => (m.text || '').includes('Maria Quispe')))
 
   const stats = await fetch(BASE + '/api/v1/stats', {
     headers: { 'X-API-Token': b64url(apiToken) }
@@ -115,11 +120,10 @@ async function main () {
   ).then(r => r.json())
   check('rango en el pasado → 0 mensajes', viejo.messages.length === 0)
 
-  // ── Cliente para bots (como lo usará ComercIA) ────────────────────
+  // ── Cliente para bots (solo token, sin clave AES) ──────────────────
   const vpe = new VerificaPE({
     baseUrl: BASE,
-    apiToken: b64url(apiToken),
-    aesKey: b64url(aesKey)
+    apiToken: b64url(apiToken)
   })
 
   const todos = await vpe.mensajes()
@@ -151,6 +155,29 @@ async function main () {
   const total = await vpe.total()
   check('cliente: total() = 3', total === 3)
 
+  // ── Pausa y reanudación ───────────────────────────────────────────
+  const pausar = await fetch(
+    `${BASE}/api/api-token/pause?channel=${encodeURIComponent(channelId)}&token=${encodeURIComponent(b64url(readToken))}`,
+    { method: 'POST' }
+  ).then(r => r.json())
+  check('pausa del token', pausar.ok === true && pausar.paused === true)
+
+  const enPausa = await fetch(BASE + '/api/v1/messages', {
+    headers: { 'X-API-Token': b64url(apiToken) }
+  })
+  check('token en pausa → la API responde 403', enPausa.status === 403)
+
+  const reanudar = await fetch(
+    `${BASE}/api/api-token/resume?channel=${encodeURIComponent(channelId)}&token=${encodeURIComponent(b64url(readToken))}`,
+    { method: 'POST' }
+  ).then(r => r.json())
+  check('reanudación del token', reanudar.ok === true && reanudar.paused === false)
+
+  const trasReanudar = await fetch(BASE + '/api/v1/messages', {
+    headers: { 'X-API-Token': b64url(apiToken) }
+  })
+  check('token reanudado → la API vuelve a responder', trasReanudar.status === 200)
+
   // ── Revocar el token ──────────────────────────────────────────────
   const rev = await fetch(
     `${BASE}/api/api-token?channel=${encodeURIComponent(channelId)}&token=${encodeURIComponent(b64url(readToken))}`,
@@ -165,7 +192,7 @@ async function main () {
 
   console.log('')
   if (failures === 0) {
-    console.log('TODO OK ✔ — la API v1 de VerificaPE está lista para ComercIA.')
+    console.log('TODO OK ✔ — la API v1 de VerificaPE está lista para bots y servicios.')
     process.exit(0)
   } else {
     console.log('FALLOS: ' + failures)

@@ -252,8 +252,9 @@ async function pull () {
     const data = await res.json()
     if (!res.ok || !data.ok) throw new Error('HTTP ' + res.status)
 
+    let added = 0
     for (const m of data.messages) {
-      if (!state.msgs.has(m.id)) state.msgs.set(m.id, m)
+      if (!state.msgs.has(m.id)) { state.msgs.set(m.id, m); added++ }
       if (m.id > state.cursor) { state.cursor = m.id; persistCursor() }
     }
     state.total = data.total
@@ -263,12 +264,16 @@ async function pull () {
       await tryDecrypt(m)
       if (m.bad) bad++
     }
+    const badChanged = bad !== state.badCount
     state.badCount = bad
 
     setOnline(true, state.sse ? 'live' : 'poll')
-    renderFeed()
-    renderStats()
-    renderAppFilter()
+    // Solo repintamos si algo cambió: evita el "parpadeo" cada ciclo de sondeo
+    if (added > 0 || badChanged) {
+      renderFeed()
+      renderStats()
+      renderAppFilter()
+    }
   } catch (e) {
     setOnline(false, state.sse ? 'live' : 'poll')
   }
@@ -301,6 +306,7 @@ function refreshLive () {
     state.msgs.clear()
     state.total = 0
     state.cursor = 0
+    renderedIds.clear()
     persistCursor()
     renderFeed(); renderStats(); renderAppFilter()
   })
@@ -413,6 +419,9 @@ function avatarFor (app) {
   return { letter, color: 'hsl(' + h + ', 52%, 44%)' }
 }
 
+/** IDs ya pintados: la animación de entrada solo se aplica a los NUEVOS. */
+const renderedIds = new Set()
+
 function renderFeed () {
   const feed = $('#feed')
   const empty = $('#empty')
@@ -441,7 +450,9 @@ function renderFeed () {
     const appName = m.plain.app || m.plain.pkg || 'App'
     const av = avatarFor(appName)
     const card = document.createElement('div')
-    card.className = 'msg' + (unread ? ' unread' : '') + (isTest ? ' otp-test' : '')
+    const isNew = !renderedIds.has(m.id)
+    card.className = 'msg' + (unread ? ' unread' : '') + (isTest ? ' otp-test' : '') + (isNew ? ' msg-in' : '')
+    renderedIds.add(m.id)
     card.innerHTML =
       '<div class="msg-head">' +
         '<span class="msg-avatar" style="background:' + av.color + '">' + esc(av.letter) + '</span>' +
@@ -540,7 +551,7 @@ function renderQR () {
 
 /* ─────────────────── vistas y menú lateral ─────────────────── */
 
-const VIEW_TITLES = { panel: 'Panel', pair: 'Emparejamiento', api: 'API (ComercIA)', stats: 'Estadísticas', settings: 'Ajustes' }
+const VIEW_TITLES = { panel: 'Panel', pair: 'Emparejamiento', api: 'API', stats: 'Estadísticas', settings: 'Ajustes' }
 
 function switchView (name) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'))
@@ -591,25 +602,48 @@ async function copyText (txt, msg) {
   }
 }
 
-function renderApiView () {
+async function renderApiView () {
   const p = state.pair
   if (!p) return
   const saved = apiToken()
-  $('#api-no-token').classList.toggle('hidden', !!saved)
-  $('#api-token-block').classList.toggle('hidden', !saved)
-  if (!saved) return
+
+  if (!saved) {
+    $('#api-no-token').classList.remove('hidden')
+    $('#api-token-block').classList.add('hidden')
+    return
+  }
+
+  // El estado real vive en el servidor: actívalo/pausado
+  let status = { exists: true, paused: false }
+  try {
+    const r = await fetch('/api/api-token?channel=' + encodeURIComponent(p.channel) +
+      '&token=' + encodeURIComponent(p.read))
+    const d = await r.json()
+    if (d.ok) status = d
+  } catch (e) { /* sin conexión: mostramos lo local */ }
+  if (status.exists === false) {
+    localStorage.removeItem(LS.api)
+    $('#api-no-token').classList.remove('hidden')
+    $('#api-token-block').classList.add('hidden')
+    return
+  }
+  saved.paused = !!status.paused
+  localStorage.setItem(LS.api, JSON.stringify(saved))
+
+  $('#api-no-token').classList.add('hidden')
+  $('#api-token-block').classList.remove('hidden')
+
+  const st = $('#api-status')
+  st.textContent = saved.paused ? '⏸ En pausa' : '● Activo'
+  st.className = 'api-status ' + (saved.paused ? 'paused' : 'active')
+  $('#btn-api-pause').textContent = saved.paused ? '▶ Reanudar' : '⏸ Pausar'
 
   $('#api-token-value').textContent = saved.token
   $('#api-key-value').textContent = p.key
   $('#api-channel-value').textContent = p.channel
   $('#api-url-value').textContent = serverUrl()
 
-  const config = {
-    baseUrl: serverUrl(),
-    apiToken: saved.token,
-    aesKey: p.key,
-    channel: p.channel
-  }
+  const config = { baseUrl: serverUrl(), apiToken: saved.token }
   $('#api-config').textContent = JSON.stringify(config, null, 2)
   $('#api-example-curl').textContent =
     'curl -H "X-API-Token: ' + saved.token + '" "' + serverUrl() + '/api/v1/messages?limit=10"'
@@ -628,15 +662,34 @@ async function genApiToken () {
     '&token=' + encodeURIComponent(p.read), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ apiHash })
+    body: JSON.stringify({ apiHash, key: p.key })   // clave: permite entregar descifrado
   })
   const data = await res.json().catch(() => ({}))
   if (res.ok && data.ok) {
-    localStorage.setItem(LS.api, JSON.stringify({ token }))
+    localStorage.setItem(LS.api, JSON.stringify({ token, paused: false }))
     toast('Token de API creado ✔')
     renderApiView()
   } else {
     toast('No se pudo crear el token: ' + (data.error || 'HTTP ' + res.status))
+  }
+}
+
+async function toggleApiPause () {
+  const p = state.pair
+  const saved = apiToken()
+  if (!p || !saved) return
+  const action = saved.paused ? 'resume' : 'pause'
+  const res = await fetch('/api/api-token/' + action +
+    '?channel=' + encodeURIComponent(p.channel) + '&token=' + encodeURIComponent(p.read), {
+    method: 'POST'
+  })
+  if (res.ok) {
+    saved.paused = !saved.paused
+    localStorage.setItem(LS.api, JSON.stringify(saved))
+    toast(saved.paused ? 'Token en pausa ⏸' : 'Token reanudado ▶')
+    renderApiView()
+  } else {
+    toast('No se pudo cambiar el estado del token')
   }
 }
 
@@ -748,9 +801,10 @@ function bindEvents () {
   })
   $('#btn-test-sound').onclick = () => { unlockAudio(); playSound() }
 
-  // API (ComercIA)
+  // API de acceso
   $('#btn-api-gen').onclick = genApiToken
   $('#btn-api-revoke').onclick = revokeApiToken
+  $('#btn-api-pause').onclick = toggleApiPause
   $('#btn-copy-token').onclick = () => copyText($('#api-token-value').textContent, 'Token copiado')
   $('#btn-copy-key').onclick = () => copyText($('#api-key-value').textContent, 'Clave AES copiada')
   $('#btn-copy-config').onclick = () => copyText($('#api-config').textContent, 'Configuración copiada')
