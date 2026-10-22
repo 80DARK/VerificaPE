@@ -203,19 +203,7 @@ npm test          # E2E del canal cifrado (12 verificaciones)
 npm run test:api  # API v1 + filtros + pausa + seguridad en disco (27)
 ```
 
-## 11. Publicar en GitHub
-
-El proyecto incluye `.gitignore` raíz: secretos (`keystore.properties`,
-`*.keystore`, `web/.env`) y binarios (`dist/`, `node_modules/`, `web/data/`)
-quedan fuera del control de versiones. Las APKs van en **GitHub Releases**.
-
-```bash
-git remote add origin https://github.com/TU_USUARIO/verificape.git
-git branch -M main
-git push -u origin main
-```
-
-## 12. Uso responsable
+## 11. Uso responsable
 
 VerificaPE está pensado para que el **dueño de la billetera** verifique sus
 propios pagos en su propio negocio: notificaciones de su propio teléfono
