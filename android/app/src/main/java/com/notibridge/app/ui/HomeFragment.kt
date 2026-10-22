@@ -5,7 +5,9 @@ import android.os.Bundle
 import android.provider.Settings
 import android.view.View
 import android.widget.Button
+import android.widget.ImageButton
 import android.widget.TextView
+import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -13,6 +15,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.notibridge.app.db.AppDatabase
 import com.notibridge.app.MainActivity
 import com.notibridge.app.NotiAccess
+import com.notibridge.app.Prefs
 import com.notibridge.app.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -31,6 +34,17 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
     private lateinit var statOtp: TextView
     private lateinit var recentAdapter: NotificationAdapter
     private lateinit var emptyRecent: TextView
+    private lateinit var powerBtn: ImageButton
+    private lateinit var listeningStatus: TextView
+
+    /** Pinta el botón circular según el estado del modo escucha. */
+    private fun updateListeningUi() {
+        val on = Prefs.get(requireContext()).getBoolean(Prefs.LISTENING, true)
+        powerBtn.isActivated = on
+        listeningStatus.text = getString(
+            if (on) R.string.listening_on_desc else R.string.listening_off_desc
+        )
+    }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         serviceStatus = view.findViewById(R.id.service_status)
@@ -38,6 +52,22 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
         statToday = view.findViewById(R.id.stat_today)
         statSent = view.findViewById(R.id.stat_sent)
         statOtp = view.findViewById(R.id.stat_otp)
+
+        // Botón circular de encendido / dormir
+        powerBtn = view.findViewById(R.id.btn_power)
+        listeningStatus = view.findViewById(R.id.listening_status)
+        updateListeningUi()
+        powerBtn.setOnClickListener {
+            val prefs = Prefs.get(requireContext())
+            val nowOn = !prefs.getBoolean(Prefs.LISTENING, true)
+            prefs.edit().putBoolean(Prefs.LISTENING, nowOn).apply()
+            updateListeningUi()
+            Toast.makeText(
+                requireContext(),
+                if (nowOn) R.string.listening_on_toast else R.string.listening_off_toast,
+                Toast.LENGTH_LONG
+            ).show()
+        }
 
         recentAdapter = NotificationAdapter()
         emptyRecent = view.findViewById(R.id.empty_recent)

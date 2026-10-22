@@ -12,6 +12,42 @@
         android:orientation="vertical"
         android:padding="16dp">
 
+        <!-- MODO ESCUCHA: botón circular para encender/dormir el servicio -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardCornerRadius="16dp"
+            app:contentPadding="16dp"
+            android:layout_marginBottom="12dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:gravity="center">
+
+                <ImageButton
+                    android:id="@+id/btn_power"
+                    android:layout_width="86dp"
+                    android:layout_height="86dp"
+                    android:background="@drawable/btn_power_selector"
+                    android:src="@drawable/ic_power"
+                    android:scaleType="centerInside"
+                    android:padding="20dp"
+                    android:contentDescription="@string/power_button_desc"
+                    android:elevation="4dp" />
+
+                <TextView
+                    android:id="@+id/listening_status"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:gravity="center"
+                    android:textSize="13sp"
+                    android:text="@string/listening_on_desc" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
         <!-- Estado del servicio -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"

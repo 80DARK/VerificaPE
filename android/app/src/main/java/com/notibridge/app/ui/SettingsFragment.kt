@@ -44,6 +44,20 @@ class SettingsFragment : Fragment(R.layout.fragment_settings) {
             prefs.edit().putBoolean(Prefs.SAVE_HISTORY, checked).apply()
         }
 
+        view.findViewById<Button>(R.id.btn_battery).setOnClickListener {
+            try {
+                // Pide al sistema eximir a VerificaPE de la optimización de batería
+                startActivity(
+                    Intent(
+                        android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                        android.net.Uri.parse("package:" + requireContext().packageName)
+                    )
+                )
+            } catch (e: Exception) {
+                // Si el fabricante bloquea el diálogo, abrir la lista de apps
+                startActivity(Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+            }
+        }
         view.findViewById<Button>(R.id.btn_open_access).setOnClickListener {
             startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
         }

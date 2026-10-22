@@ -53,6 +53,17 @@ class MainActivity : AppCompatActivity() {
             SecureStore.migrateLegacy(applicationContext, legacy?.channelId)
         }
 
+        // Tras actualizar la app, Android a veces desengancha el servicio de
+        // notificaciones. Pedirle que lo reenganche al abrir VerificaPE
+        // (el sistema también lo reengancha solo tras reiniciar el teléfono).
+        if (NotiAccess.isEnabled(this)) {
+            try {
+                android.service.notification.NotificationListenerService.requestRebind(
+                    android.content.ComponentName(this, NotiListenerService::class.java)
+                )
+            } catch (e: Exception) { /* mejor esfuerzo */ }
+        }
+
         if (savedInstanceState == null) navigateTo(R.id.nav_home)
     }
 

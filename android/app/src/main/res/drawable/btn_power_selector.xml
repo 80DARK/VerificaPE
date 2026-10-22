@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Encendido: escuchando -->
+    <item android:state_activated="true">
+        <shape android:shape="oval">
+            <solid android:color="#16A34A" />
+        </shape>
+    </item>
+    <!-- Dormido: gris -->
+    <item>
+        <shape android:shape="oval">
+            <solid android:color="#475569" />
+        </shape>
+    </item>
+</selector>

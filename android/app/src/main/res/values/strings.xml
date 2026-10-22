@@ -12,6 +12,11 @@
     <string name="menu_settings">Ajustes</string>
 
     <!-- Inicio -->
+    <string name="power_button_desc">Encender o dormir el modo escucha</string>
+    <string name="listening_on_desc">● Escuchando: las notificaciones activadas se envían a la web.\nToca el botón para DORMIR el servicio.</string>
+    <string name="listening_off_desc">⏸ Dormido: no se lee ni se envía nada.\nToca el botón para volver a escuchar.</string>
+    <string name="listening_on_toast">Modo escucha activado ✔</string>
+    <string name="listening_off_toast">Servicio dormido ⏸ (no se lee ni se envía nada)</string>
     <string name="access_card_title">Acceso a notificaciones</string>
     <string name="service_on">● Servicio activo: escuchando notificaciones</string>
     <string name="service_off">● Sin acceso: concede el permiso en Ajustes del sistema</string>
@@ -82,6 +87,7 @@
     <string name="otp_fixed_note">Filtro OTP SIEMPRE activo: las notificaciones de la app de SMS y las que parecen códigos de verificación nunca se guardan (contenido) ni se reenvían. No se puede desactivar.</string>
     <string name="e2e_note">Cifrado de extremo a extremo AES-256-GCM. El servidor web solo almacena datos cifrados; la clave solo existe en este dispositivo y en tu navegador.</string>
     <string name="settings_section_actions">Acciones</string>
+    <string name="btn_battery">Liberar de la optimización de batería (fiabilidad)</string>
     <string name="btn_open_access">Abrir ajustes de acceso a notificaciones</string>
     <string name="btn_clear_local">Borrar historial local</string>
     <string name="btn_unpair_settings">Desemparejar de la web</string>

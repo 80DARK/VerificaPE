@@ -13,8 +13,8 @@ android {
         applicationId "com.notibridge.app"   // se mantiene para poder actualizar sobre la app ya instalada
         minSdk 26
         targetSdk 34
-        versionCode 3
-        versionName "1.2.0"
+        versionCode 4
+        versionName "1.2.1"
     }
 
     // La clave de firma es PERSONAL y no se sube al repositorio (.gitignore).

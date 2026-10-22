@@ -28,6 +28,11 @@ class NotiListenerService : NotificationListenerService() {
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         // Nunca nos miramos a nosotros mismos
         if (sbn.packageName == packageName) return
+
+        // MODO DORMIR: si el dueño apagó la escucha, ignorar TODO
+        // (sin leer, sin guardar, sin enviar). Se reactiva con el botón de Inicio.
+        if (!Prefs.get(this).getBoolean(Prefs.LISTENING, true)) return
+
         scope.launch { process(sbn) }
     }
 

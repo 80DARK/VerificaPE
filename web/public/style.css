@@ -181,8 +181,8 @@ code { background: var(--card-2); padding: 1px 6px; border-radius: 6px; font-siz
   border: 1px solid var(--border);
   background: var(--card);
   color: var(--text-soft);
-  width: 36px; height: 34px;
-  border-radius: 10px;
+  width: 42px; height: 40px;
+  border-radius: 11px;
   cursor: pointer;
   font-size: 15px;
   display: inline-flex;

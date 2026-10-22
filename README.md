@@ -38,6 +38,8 @@ VerificaPE son dos piezas que trabajan juntas:
 | **Todo desactivado por defecto** | Cada app nueva entra con `enabled = false` |
 | **Emparejar escaneando un QR** | La web genera el QR; la app lo escanea (o pegas el código) |
 | **Varios QR a la vez** (multi-canal) | Escanea todos los paneles que quieras: cada notificación se envía cifrada a TODOS |
+| ⏸ **Botón de dormir** (circular, en Inicio) | Apaga la escucha sin desinstalar ni forzar detención: nada se lee ni se envía hasta que lo reactives |
+| 🔋 **Sigue escuchando tras cerrar la app o reiniciar** | Servicio enlazado al sistema (se reengancha solo) + exención de batería en un clic |
 | **Cifrado extremo a extremo** | AES-256-GCM; la clave solo viaja en el QR; el servidor solo ve ciphertext |
 | **Menú lateral izquierdo, vertical y retráctil** | App: `DrawerLayout` + `NavigationView` · Web: sidebar colapsable |
 | ⚡ **Latencia < 1 segundo** | Push en vivo por **SSE** (test real: 7–15 ms) + sondeo de respaldo |
@@ -126,6 +128,18 @@ node test-e2e.js     # 12 pruebas: cifrado, webhook, push SSE (<1 s), borrados�
 
 ## ⚠️ Notas y limitaciones
 
+- **¿Sigue escuchando si cierras la app o reinicias el teléfono?** Sí: el
+  lector de notificaciones es un servicio *enlazado al sistema* (no lo matan
+  ni el cierre de la app ni el reinicio — el sistema lo reengancha solo).
+  Para máxima fiabilidad en celulares agresivos con la batería (Xiaomi,
+  Huawei…), usa **Ajustes → Liberar de la optimización de batería**.
+  Tras una actualización de la app, VerificaPE pide reengancharse
+  automáticamente al abrirse. Si el teléfono está **apagado**, ninguna app
+  puede escuchar: al encenderlo, el servicio se reconecta y captura todo lo
+  que llegue desde ese momento.
+- **Dormir el servicio**: el botón circular de Inicio detiene la lectura
+  (nada se lee, guarda ni envía) sin tocar permisos ni desinstalar. Toca
+  otra vez para despertarlo.
 - La latencia total es la del viaje teléfono→servidor (LAN ≈ instantáneo;
   túnel ≈ 0.1–0.5 s) + unos milisegundos de SSE.
 - Si tu teléfono demora en *emitir* la notificación (estilo Xiaomi/Huawei),
