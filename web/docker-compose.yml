@@ -26,7 +26,14 @@ services:
   tunnel:
     image: cloudflare/cloudflared:latest
     container_name: verificape-tunnel
+    # A) Quick Tunnel (gratis, la URL CAMBIA al reiniciar):
     command: tunnel --url http://verificape:3000 --no-autoupdate
+    # B) Dominio propio con túnel de nombre (URL FIJA para siempre):
+    #    crea el túnel en Cloudflare Zero Trust, pon TUNNEL_TOKEN=... en .env
+    #    y reemplaza la línea "command" de arriba por:
+    #      command: tunnel run --token ${TUNNEL_TOKEN}
+    environment:
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN:-}
     depends_on:
       - verificape
     restart: unless-stopped

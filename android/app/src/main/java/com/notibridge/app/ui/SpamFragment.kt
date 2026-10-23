@@ -26,6 +26,7 @@ import com.notibridge.app.Wallets
 import com.notibridge.app.db.AppDatabase
 import com.notibridge.app.db.NotificationLogEntity
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
@@ -62,22 +63,17 @@ class SpamFragment : Fragment(R.layout.fragment_spam) {
             adapter = this@SpamFragment.adapter
         }
         view.findViewById<TextView>(R.id.btn_probar_lector).setOnClickListener { probarLector() }
-    }
 
-    override fun onResume() {
-        super.onResume()
-        cargar()
-    }
-
-    private fun cargar() {
+        // EN VIVO: el flujo de Room repinta solo cuando llegan notificaciones
         val appCtx = requireContext().applicationContext
-        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
-            val lista = AppDatabase.get(appCtx).logs().nonPayments(300)
-            withContext(Dispatchers.Main) {
-                if (!isAdded) return@withContext
-                adapter.submit(lista)
-                view?.findViewById<TextView>(R.id.spam_empty)?.visibility =
-                    if (lista.isEmpty()) View.VISIBLE else View.GONE
+        viewLifecycleOwner.lifecycleScope.launch {
+            AppDatabase.get(appCtx).logs().nonPaymentsFlow(300).collectLatest { lista ->
+                withContext(Dispatchers.Main) {
+                    if (!isAdded) return@withContext
+                    adapter.submit(lista)
+                    view?.findViewById<TextView>(R.id.spam_empty)?.visibility =
+                        if (lista.isEmpty()) View.VISIBLE else View.GONE
+                }
             }
         }
     }
@@ -144,7 +140,6 @@ class SpamFragment : Fragment(R.layout.fragment_spam) {
             withContext(Dispatchers.Main) {
                 if (!isAdded) return@withContext
                 Toast.makeText(requireContext(), R.string.spam_marked, Toast.LENGTH_SHORT).show()
-                cargar()
             }
         }
     }
@@ -153,7 +148,7 @@ class SpamFragment : Fragment(R.layout.fragment_spam) {
         val appCtx = requireContext().applicationContext
         viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
             AppDatabase.get(appCtx).logs().deleteById(item.id)
-            withContext(Dispatchers.Main) { if (isAdded) cargar() }
+            // el flujo en vivo repinta solo
         }
     }
 }

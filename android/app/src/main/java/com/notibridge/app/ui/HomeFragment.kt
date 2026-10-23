@@ -15,7 +15,6 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.notibridge.app.MainActivity
 import com.notibridge.app.NotiAccess
 import com.notibridge.app.NotiListenerService
 import com.notibridge.app.Prefs
@@ -25,6 +24,9 @@ import com.notibridge.app.Wallets
 import com.notibridge.app.db.AppDatabase
 import com.notibridge.app.db.NotificationLogEntity
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -37,12 +39,10 @@ import java.util.Locale
 
 /**
  * Pantalla de inicio FINANCIERA (glassmorphism):
- *  - Tarjeta de INGRESOS DE HOY (total S/ y cantidad de pagos)
- *  - Botón circular para dormir/despertar la escucha (con reenganche forzado
- *    al despertar: corrige el bug en que el sistema no volvía a entregar
- *    notificaciones tras dormir el servicio)
+ *  - Tarjeta de INGRESOS DE HOY (total S/ y cantidad de pagos), EN VIVO
  *  - Historial de pagos AGRUPADO POR DÍA con monto, pagador, hora y billetera
  *  - Filtro por fechas (Hoy / 7 días / Mes / Todo) y EXPORTACIÓN CSV (Excel)
+ *  - Botón circular para dormir/despertar la escucha (con reenganche forzado)
  */
 class HomeFragment : Fragment(R.layout.fragment_home) {
 
@@ -55,6 +55,7 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
 
     private var filtroActual = FILTRO_HOY
     private var listaPagos: List<NotificationLogEntity> = emptyList()
+    private var colectorPagos: Job? = null
 
     private val moneyFormat: NumberFormat =
         NumberFormat.getNumberInstance(Locale("es", "PE")).apply {
@@ -108,22 +109,23 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
             view.findViewById<TextView>(id).setOnClickListener {
                 filtroActual = filtro
                 pintarChips()
-                cargarPagos()
+                observarPagos()
             }
         }
         pintarChips()
 
-        // Exportar CSV (Excel)
         view.findViewById<TextView>(R.id.btn_export).setOnClickListener { exportarCsv() }
-
-        // Botón "Probar" del canal: envía un pago de prueba
         view.findViewById<TextView>(R.id.btn_test_pago).setOnClickListener { enviarPagoPrueba() }
+
+        // Datos EN VIVO (Room Flow): llegan sin recargar la pantalla
+        observarIngresos()
+        observarPagos()
     }
 
     override fun onResume() {
         super.onResume()
         updateListeningUi()
-        cargarPagos()
+        cargarStatus()
     }
 
     // ─────────────────── despertar con reenganche ───────────────────
@@ -131,7 +133,6 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
     /**
      * FIX del bug "duermo y despierto y ya no escucha": al despertar pedimos
      * explícitamente al sistema que (re)enganchen el lector de notificaciones.
-     * Cubre el caso en que el sistema desenganchara el servicio por su cuenta.
      */
     private fun despertarServicio() {
         try {
@@ -139,7 +140,7 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
                 ComponentName(requireContext(), NotiListenerService::class.java)
             )
         } catch (e: Exception) {
-            // mejor esfuerzo: el sistema igual debería seguir entregando
+            // mejor esfuerzo
         }
     }
 
@@ -151,7 +152,7 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
         )
     }
 
-    // ─────────────────── datos financieros ───────────────────
+    // ─────────────────── datos en vivo (Room Flow) ───────────────────
 
     private fun inicioDeHoy(): Long {
         val cal = Calendar.getInstance()
@@ -173,32 +174,63 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
         else -> 0L
     }
 
-    private fun cargarPagos() {
+    /** Ingresos de hoy (total + cantidad), en vivo. */
+    private fun observarIngresos() {
+        val appCtx = requireContext().applicationContext
+        viewLifecycleOwner.lifecycleScope.launch {
+            val db = AppDatabase.get(appCtx)
+            launch {
+                db.logs().incomeSinceFlow(inicioDeHoy()).collect { total ->
+                    withContext(Dispatchers.Main) {
+                        if (isAdded) incomeTotal.text = "S/ ${moneyFormat.format(total)}"
+                    }
+                }
+            }
+            launch {
+                db.logs().paymentsCountSinceFlow(inicioDeHoy()).collect { n ->
+                    withContext(Dispatchers.Main) {
+                        if (isAdded) incomeCount.text = getString(R.string.income_count_fmt, n)
+                    }
+                }
+            }
+        }
+    }
+
+    /** Lista de pagos del filtro activo, en vivo (Room invalida el flujo). */
+    private fun observarPagos() {
+        colectorPagos?.cancel()
+        val appCtx = requireContext().applicationContext
+        colectorPagos = viewLifecycleOwner.lifecycleScope.launch {
+            AppDatabase.get(appCtx).logs().paymentsSinceFlow(rangoFiltro(), 1000)
+                .collectLatest { pagos ->
+                    listaPagos = pagos
+                    withContext(Dispatchers.Main) {
+                        if (!isAdded) return@withContext
+                        pagosAdapter.submit(pagos)
+                        view?.findViewById<TextView>(R.id.pagos_empty)?.visibility =
+                            if (pagos.isEmpty()) View.VISIBLE else View.GONE
+                    }
+                }
+        }
+    }
+
+    /** Línea de estado (acceso, canales, OTP): consulta puntual al reanudar. */
+    private fun cargarStatus() {
         val appCtx = requireContext().applicationContext
         viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
             val db = AppDatabase.get(appCtx)
-            val inicio = inicioDeHoy()
-            val totalHoy = db.logs().incomeSince(inicio)
-            val countHoy = db.logs().paymentsCountSince(inicio)
-            val pagos = db.logs().paymentsSince(rangoFiltro(), 1000)
             val canales = db.pairing().count()
             val otp = db.logs().countIgnored()
             val acceso = NotiAccess.isEnabled(appCtx)
-
             withContext(Dispatchers.Main) {
                 if (!isAdded) return@withContext
-                incomeTotal.text = "S/ ${moneyFormat.format(totalHoy)}"
-                incomeCount.text = getString(R.string.income_count_fmt, countHoy)
                 statusLine.text = buildString {
-                    append(if (acceso) "✓ Acceso " else "⚠ Sin acceso · ")
+                    append(if (acceso) "✓ Acceso" else "⚠ Sin acceso")
+                    append(" · ")
                     append(getString(R.string.canal_count, canales))
                     append(" · ")
                     append(getString(R.string.otp_blocked_count, otp))
                 }
-                listaPagos = pagos
-                pagosAdapter.submit(pagos)
-                view?.findViewById<TextView>(R.id.pagos_empty)?.visibility =
-                    if (pagos.isEmpty()) View.VISIBLE else View.GONE
             }
         }
     }
@@ -225,15 +257,22 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
         viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
             try {
                 val dir = File(appCtx.cacheDir, "exports").apply { mkdirs() }
-                val archivo = File(dir, "verificape_pagos_${SimpleDateFormat("yyyyMMdd_HHmm", Locale.US).format(Date())}.csv")
+                val archivo = File(
+                    dir,
+                    "verificape_pagos_${SimpleDateFormat("yyyyMMdd_HHmm", Locale.US).format(Date())}.csv"
+                )
                 archivo.writeText(generarCsv(), Charsets.UTF_8)
-                val uri = FileProvider.getUriForFile(appCtx, "${appCtx.packageName}.fileprovider", archivo)
+                val uri = FileProvider.getUriForFile(
+                    appCtx, "${appCtx.packageName}.fileprovider", archivo
+                )
                 withContext(Dispatchers.Main) {
                     if (!isAdded) return@withContext
                     val intent = Intent(Intent.ACTION_SEND).apply {
                         type = "text/csv"
                         putExtra(Intent.EXTRA_STREAM, uri)
-                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+                        addFlags(
+                            Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
+                        )
                     }
                     startActivity(Intent.createChooser(intent, getString(R.string.export_title)))
                 }
@@ -306,15 +345,18 @@ sealed class FilaPago {
     data class Pago(val pago: NotificationLogEntity, val colorWallet: Int, val letra: Char) : FilaPago()
 }
 
-class PagosAdapter : RecyclerView.Adapter<PagosAdapter.VH>() {
+/**
+ * Adaptador con DOS ViewHolders separados (encabezado de día y fila de pago):
+ * el crash v1.3.1 ocurría porque un solo ViewHolder buscaba los IDs de la fila
+ * de pago dentro del layout del encabezado (findViewById devolvía null).
+ */
+class PagosAdapter : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     private val filas = mutableListOf<FilaPago>()
     private val fHora = SimpleDateFormat("HH:mm", Locale.getDefault())
 
     fun submit(pagos: List<NotificationLogEntity>) {
         filas.clear()
-
-        // Agrupar por día (ya vienen en DESC: más reciente primero)
         val fDiaKey = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
         val porDia = LinkedHashMap<String, MutableList<FilaPago.Pago>>()
         val etiquetas = HashMap<String, String>()
@@ -347,9 +389,14 @@ class PagosAdapter : RecyclerView.Adapter<PagosAdapter.VH>() {
         }
     }
 
-    class VH(view: View) : RecyclerView.ViewHolder(view) {
-        val diaTitulo: TextView = view.findViewById(R.id.dia_titulo)
-        val diaTotal: TextView = view.findViewById(R.id.dia_total)
+    /** Encabezado de día. */
+    class DiaVH(view: View) : RecyclerView.ViewHolder(view) {
+        val titulo: TextView = view.findViewById(R.id.dia_titulo)
+        val total: TextView = view.findViewById(R.id.dia_total)
+    }
+
+    /** Fila de pago. */
+    class PagoVH(view: View) : RecyclerView.ViewHolder(view) {
         val badge: TextView = view.findViewById(R.id.pago_badge)
         val pagador: TextView = view.findViewById(R.id.pago_pagador)
         val hora: TextView = view.findViewById(R.id.pago_hora)
@@ -360,24 +407,31 @@ class PagosAdapter : RecyclerView.Adapter<PagosAdapter.VH>() {
     override fun getItemViewType(position: Int): Int =
         if (filas[position] is FilaPago.Dia) 0 else 1
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
-        val layout = if (viewType == 0) R.layout.item_dia else R.layout.item_pago
-        return VH(LayoutInflater.from(parent.context).inflate(layout, parent, false))
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
+        val inflater = LayoutInflater.from(parent.context)
+        return if (viewType == 0) {
+            DiaVH(inflater.inflate(R.layout.item_dia, parent, false))
+        } else {
+            PagoVH(inflater.inflate(R.layout.item_pago, parent, false))
+        }
     }
 
     override fun getItemCount(): Int = filas.size
 
-    override fun onBindViewHolder(holder: VH, position: Int) {
+    override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
         val money = NumberFormat.getNumberInstance(Locale("es", "PE")).apply {
             maximumFractionDigits = 2; minimumFractionDigits = 2
         }
-        when (val fila = filas[position]) {
-            is FilaPago.Dia -> {
-                holder.diaTitulo.text = fila.titulo
-                holder.diaTotal.text = "S/ ${money.format(fila.total)}"
+        when {
+            holder is DiaVH && filas[position] is FilaPago.Dia -> {
+                val fila = filas[position] as FilaPago.Dia
+                holder.titulo.text = fila.titulo
+                holder.total.text = "S/ ${money.format(fila.total)}"
             }
-            is FilaPago.Pago -> {
-                holder.pagador.text = fila.pago.payerName ?: holder.itemView.context.getString(R.string.pago_sin_nombre)
+            holder is PagoVH && filas[position] is FilaPago.Pago -> {
+                val fila = filas[position] as FilaPago.Pago
+                holder.pagador.text = fila.pago.payerName
+                    ?: holder.itemView.context.getString(R.string.pago_sin_nombre)
                 holder.hora.text = fHora.format(Date(fila.pago.loggedAt))
                 holder.monto.text = "S/ ${money.format(fila.pago.amount ?: 0.0)}"
                 holder.walletName.text = fila.pago.wallet ?: fila.pago.appName

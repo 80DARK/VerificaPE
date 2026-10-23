@@ -6,7 +6,7 @@
   <meta name="robots" content="noindex">
   <title>VerificaPE · Panel web</title>
   <link rel="stylesheet" href="/style.css">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%2316A34A' d='M12 2l8 3.5V11c0 5-3.4 8.8-8 11-4.6-2.2-8-6-8-11V5.5L12 2z'/><path fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='M8.5 11.5l2.5 2.5 4.5-4.5'/></svg>">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><rect width='24' height='24' rx='6' fill='%230B3D2E'/><path fill='none' stroke='white' stroke-width='1.8' d='M12 3.5a8.5 8.5 0 1 0 .001 0z M9 12l2.3 2.3L15.5 9.5'/></svg>">
 </head>
 <body data-theme="dark">
 <div class="app">
@@ -15,7 +15,7 @@
   <aside id="sidebar" class="sidebar">
     <div class="brand">
       <span class="brand-icon">
-        <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M12 2l8 3.5V11c0 5-3.4 8.8-8 11-4.6-2.2-8-6-8-11V5.5L12 2z" fill="currentColor" opacity=".92"/><path d="M8.5 11.5l2.5 2.5 4.5-4.5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <svg width="27" height="27" viewBox="0 0 24 24" fill="none"><rect width="24" height="24" rx="6" fill="#0B3D2E"/><path d="M12 3.5a8.5 8.5 0 1 0 .001 0z" stroke="#34D399" stroke-width="1.8"/><path d="M9 12l2.3 2.3L15.5 9.5" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </span>
       <span class="brand-text">VerificaPE</span>
     </div>
@@ -65,9 +65,22 @@
           ⚠️ Este navegador no está en un <b>contexto seguro</b> (abre el panel en
           <code>localhost</code> o por HTTPS).
         </div>
+        <!-- Resumen financiero del día -->
+        <div id="today-strip" class="today-strip glass">
+          <div class="ts-main">
+            <span class="ts-label">INGRESOS DE HOY</span>
+            <span id="today-amount" class="ts-amount">S/ 0.00</span>
+          </div>
+          <span id="today-count" class="ts-count">0 pagos</span>
+        </div>
+
         <div class="toolbar-row">
           <input id="search" type="search" placeholder="🔍 Buscar en notificaciones…">
-          <select id="app-filter" title="Filtrar por app"><option value="">Todas las apps</option></select>
+          <div class="kind-chips">
+            <button class="kchip active" data-kind="pagos">💰 Pagos</button>
+            <button class="kchip" data-kind="spam">🚫 Spam</button>
+            <button class="kchip" data-kind="todo">Todo</button>
+          </div>
           <button id="btn-refresh" class="icon-btn" title="Refrescar ahora">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
           </button>
@@ -75,6 +88,7 @@
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12.5l5 5L21 6.5"/></svg>
           </button>
         </div>
+        <div id="app-filter" class="app-chips" title="Filtra por billetera(s) — multiselección"></div>
         <div id="decrypt-warn" class="banner hidden">
           🔒 Hay mensajes que no se pudieron descifrar con la clave guardada en este navegador.
         </div>
@@ -105,6 +119,16 @@
           <label class="field-label" for="server-url">Dirección del servidor que verá el teléfono
             <input id="server-url" type="text" spellcheck="false">
           </label>
+          <p id="url-source-note" class="muted tiny"></p>
+          <div class="row">
+            <button id="btn-url-auto" class="secondary">↺ Usar URL automática</button>
+          </div>
+          <p class="muted tiny">⚙️ <b>Dominio propio (recomendado)</b>: si tienes un dominio
+             fijo (ej. <code>https://caja.tudominio.com</code> apuntando a este servidor con
+             un túnel de Cloudflare con nombre), ponlo aquí: el QR apuntará siempre a él y
+             <b>nunca más tendrás que re-escanear</b> aunque reinicies el servidor.
+             Si usas el túnel rápido (URL cambia), pega la nueva URL aquí o abre el panel
+             desde esa dirección para que el QR la tome solo.</p>
           <p id="tunnel-note" class="muted tiny hidden"></p>
           <p class="muted tiny">Si usas <code>start.ps1</code> o el <code>docker compose --profile tunnel</code>,
              el túnel gratuito de Cloudflare se configura solo y el QR apunta a la URL pública

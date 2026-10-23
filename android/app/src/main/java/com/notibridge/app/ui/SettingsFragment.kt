@@ -34,7 +34,7 @@ class SettingsFragment : Fragment(R.layout.fragment_settings) {
         swForward.isChecked = prefs.getBoolean(Prefs.FORWARD, true)
         swOngoing.isChecked = prefs.getBoolean(Prefs.IGNORE_ONGOING, true)
         swHistory.isChecked = prefs.getBoolean(Prefs.SAVE_HISTORY, true)
-        swPaymentsOnly.isChecked = prefs.getBoolean(Prefs.PAYMENTS_ONLY, true)
+        swPaymentsOnly.isChecked = prefs.getBoolean(Prefs.PAYMENTS_ONLY, false)
 
         swForward.setOnCheckedChangeListener { _, checked ->
             prefs.edit().putBoolean(Prefs.FORWARD, checked).apply()

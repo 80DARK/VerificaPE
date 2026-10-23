@@ -108,13 +108,19 @@ class NotiListenerService : NotificationListenerService() {
             }
         }
 
-        // Deduplicación (resumen de grupo + hija traen el mismo texto)
-        if (text.isNotBlank()) {
-            val dupes = db.logs().countRecentSameText(
-                sbn.packageName, System.currentTimeMillis() - 15000, text
-            )
-            if (dupes > 0) return
+        // Deduplicación robusta: la misma notificación puede llegar como hija
+        // de grupo y como resumen (a veces con textos ligeramente distintos).
+        val recientes = db.logs().recentForPackage(
+            sbn.packageName, System.currentTimeMillis() - 90_000
+        )
+        val duplicado = recientes.any { r ->
+            // Mismo instante de publicación (hija y resumen van en el mismo lote)
+            (kotlin.math.abs(r.postTime - sbn.postTime) < 5_000) ||
+                // O mismo título + texto normalizado (re-publicación de la misma)
+                (r.title == title && r.text != null && text.isNotBlank() &&
+                    normalizar(r.text!!) == normalizar(text))
         }
+        if (duplicado) return
 
         // ---- Filtro OTP (siempre activo) ----
         val otpReason = OTPFilter.check(this, sbn.packageName, title, text)
@@ -166,8 +172,8 @@ class NotiListenerService : NotificationListenerService() {
         // ---- Reenvío cifrado al webhook ----
         if (!prefs.getBoolean(Prefs.FORWARD, true)) return
 
-        // Por defecto SOLO se envían los pagos (las promos ensuciarían la caja)
-        val soloPagos = prefs.getBoolean(Prefs.PAYMENTS_ONLY, true)
+        // Por defecto se envía TODO al panel (pagos y spam); el panel filtra.
+        val soloPagos = prefs.getBoolean(Prefs.PAYMENTS_ONLY, false)
         if (soloPagos && pago == null) return
 
         val payload = org.json.JSONObject().apply {
@@ -195,5 +201,8 @@ class NotiListenerService : NotificationListenerService() {
 
     companion object {
         private const val TAG = "VerificaPE"
+
+        /** Colapsa espacios y recorta: para comparar textos casi idénticos. */
+        private fun normalizar(s: String) = s.replace(Regex("\\s+"), " ").trim().take(60)
     }
 }

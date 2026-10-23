@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Upsert
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface MonitoredAppDao {
@@ -85,6 +86,31 @@ interface NotificationLogDao {
     @Query("SELECT * FROM notification_logs WHERE isPayment = 0 ORDER BY loggedAt DESC LIMIT :limit")
     suspend fun nonPayments(limit: Int): List<NotificationLogEntity>
 
+    /** Flujo EN VIVO de descartes (se actualiza solo al llegar notificaciones). */
+    @Query("SELECT * FROM notification_logs WHERE isPayment = 0 ORDER BY loggedAt DESC LIMIT :limit")
+    fun nonPaymentsFlow(limit: Int): Flow<List<NotificationLogEntity>>
+
+    /** Flujo EN VIVO de pagos desde una fecha (para Inicio). */
+    @Query(
+        "SELECT * FROM notification_logs WHERE isPayment = 1 AND loggedAt >= :since " +
+        "ORDER BY loggedAt DESC LIMIT :limit"
+    )
+    fun paymentsSinceFlow(since: Long, limit: Int): Flow<List<NotificationLogEntity>>
+
+    /** Flujo EN VIVO del total de ingresos desde una fecha. */
+    @Query(
+        "SELECT COALESCE(SUM(amount), 0) FROM notification_logs " +
+        "WHERE isPayment = 1 AND loggedAt >= :since"
+    )
+    fun incomeSinceFlow(since: Long): Flow<Double>
+
+    /** Flujo EN VIVO de la cantidad de pagos desde una fecha. */
+    @Query(
+        "SELECT COUNT(*) FROM notification_logs " +
+        "WHERE isPayment = 1 AND loggedAt >= :since"
+    )
+    fun paymentsCountSinceFlow(since: Long): Flow<Int>
+
     /** El usuario corrige a mano un pago que el filtro descartó. */
     @Query(
         "UPDATE notification_logs SET isPayment = 1, amount = :amount, payerName = :payer, " +
@@ -95,12 +121,12 @@ interface NotificationLogDao {
     @Query("DELETE FROM notification_logs WHERE id = :id")
     suspend fun deleteById(id: Long)
 
-    /** Deduplicación: mismo texto del mismo paquete en los últimos 15 s. */
+    /** Deduplicación: registros recientes del mismo paquete (para comparar en código). */
     @Query(
-        "SELECT COUNT(*) FROM notification_logs WHERE packageName = :pkg " +
-        "AND loggedAt >= :desde AND text = :text"
+        "SELECT * FROM notification_logs WHERE packageName = :pkg " +
+        "AND loggedAt >= :desde ORDER BY id DESC LIMIT 30"
     )
-    suspend fun countRecentSameText(pkg: String, desde: Long, text: String): Int
+    suspend fun recentForPackage(pkg: String, desde: Long): List<NotificationLogEntity>
 }
 
 @Dao

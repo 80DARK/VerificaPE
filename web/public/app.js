@@ -33,7 +33,9 @@ const state = {
   total: 0,
   badCount: 0,
   tunnelUrl: '',       // URL pública del túnel cloudflared (si existe)
-  sse: false           // push en vivo conectado
+  sse: false,          // push en vivo conectado
+  filterApps: new Set(),// multiselección de billeteras (vacío = todas)
+  kindFilter: 'pagos'  // 'pagos' | 'spam' | 'todo'
 }
 
 /* ─────────────────── utilidades ─────────────────── */
@@ -378,6 +380,76 @@ async function deleteMsg (id) {
   } else toast('No se pudo borrar el mensaje')
 }
 
+/* ─────────────────── datos financieros ─────────────────── */
+
+const WALLETS = [
+  { match: 'yape', name: 'Yape', color: '#7A29E9' },
+  { match: 'plin', name: 'Plin', color: '#00A9E0' },
+  { match: 'sip', name: 'SIP', color: '#00B04F' },
+  { match: 'bim', name: 'bIM', color: '#00A0B8' },
+  { match: 'interbank', name: 'Interbank', color: '#0B6EC9' },
+  { match: 'bcp', name: 'BCP', color: '#002878' },
+  { match: 'bbva', name: 'BBVA', color: '#004481' },
+  { match: 'scotiabank', name: 'Scotiabank', color: '#EC1111' },
+  { match: 'mibanco', name: 'MiBanco', color: '#D51317' },
+  { match: 'pichincha', name: 'Pichincha', color: '#E30613' },
+  { match: 'caja', name: 'Caja', color: '#6D28D9' }
+]
+
+function walletInfo (name) {
+  const n = String(name || '').toLowerCase()
+  const w = WALLETS.find(x => n.includes(x.match))
+  if (w) return { name: w.name, color: w.color, letter: w.name.charAt(0) }
+  let h = 0
+  for (const c of String(name || '')) h = (h * 31 + c.charCodeAt(0)) % 360
+  return { name: name || 'App', color: 'hsl(' + h + ', 52%, 44%)', letter: (name || '?').charAt(0).toUpperCase() }
+}
+
+/** Extrae el primer monto "S/ x" del texto. */
+function extraerMonto (text) {
+  const m = /S\/\s*([0-9]{1,3}(?:[.,][0-9]{3})*(?:[.,][0-9]{1,2})?|[0-9]+(?:[.,][0-9]{1,2})?)/.exec(text || '')
+  if (!m) return null
+  return parseFloat(m[1].replace(/,/g, ''))
+}
+
+const VERBOS_PAGO = [
+  'te envió un pago', 'te envio un pago', 'te envió dinero', 'recibiste un pago',
+  'recibiste un abono', 'recibiste una transferencia', 're pagó', 'te pagó',
+  'te realizó un pago', 'te transfirió', 'te transfirio', 'recibiste s/',
+  'abono a tu cuenta', 'te yapeó', 'te yapeo', 'pago recibido'
+]
+
+/** ¿La notificación descifrada es un PAGO? (como en la app Android) */
+function esPago (m) {
+  if (!m.plain) return false
+  if (m.plain.type === 'payment' || m.plain.amount !== undefined) return true
+  const t = ((m.plain.title || '') + ' ' + (m.plain.text || '')).toLowerCase()
+  const recepcion = VERBOS_PAGO.some(v => t.includes(v))
+  return recepcion && extraerMonto(m.plain.text || '') !== null
+}
+
+function montoDe (m) {
+  if (m.plain.amount !== undefined && m.plain.amount !== null) return m.plain.amount
+  return extraerMonto(m.plain.text || '')
+}
+
+/** Resumen financiero del día (strip superior del Panel). */
+function updateTodayStrip () {
+  const inicio = new Date()
+  inicio.setHours(0, 0, 0, 0)
+  let total = 0
+  let n = 0
+  for (const m of state.msgs.values()) {
+    if (!m.plain || !esPago(m)) continue
+    const t = m.plain.time || m.received_at
+    if (t < inicio.getTime()) continue
+    const monto = montoDe(m)
+    if (monto !== null) { total += monto; n++ }
+  }
+  $('#today-amount').textContent = 'S/ ' + total.toFixed(2)
+  $('#today-count').textContent = n + (n === 1 ? ' pago' : ' pagos')
+}
+
 /* ─────────────────── render ─────────────────── */
 
 function setOnline (ok, mode) {
@@ -396,14 +468,18 @@ function setOnline (ok, mode) {
 
 function visibleMsgs () {
   const q = $('#search').value.trim().toLowerCase()
-  const app = $('#app-filter').value
   const list = []
   for (const m of state.msgs.values()) {
     if (!m.plain) continue
-    if (app && (m.plain.app || '') !== app) continue
+    const pago = esPago(m)
+    if (state.kindFilter === 'pagos' && !pago) continue
+    if (state.kindFilter === 'spam' && pago) continue
+    const app = m.plain.app || m.plain.pkg || 'App'
+    if (state.filterApps.size > 0 && !state.filterApps.has(app)) continue
     if (q) {
-      const hay = (m.plain.title || '') + ' ' + (m.plain.text || '') + ' ' + (m.plain.app || '')
-      if (!hay.toLowerCase().includes(q)) continue
+      const hay = ((m.plain.title || '') + ' ' + (m.plain.text || '') + ' ' +
+        app + ' ' + (m.plain.payer || '')).toLowerCase()
+      if (!hay.includes(q)) continue
     }
     list.push(m)
   }
@@ -448,22 +524,48 @@ function renderFeed () {
     const isTest = m.plain.type === 'test'
     const unread = m.id > state.lastRead
     const appName = m.plain.app || m.plain.pkg || 'App'
-    const av = avatarFor(appName)
+    const pago = esPago(m)
     const card = document.createElement('div')
     const isNew = !renderedIds.has(m.id)
-    card.className = 'msg' + (unread ? ' unread' : '') + (isTest ? ' otp-test' : '') + (isNew ? ' msg-in' : '')
+    card.className = 'msg' + (pago ? ' pago' : ' spam') +
+      (unread ? ' unread' : '') + (isTest ? ' otp-test' : '') + (isNew ? ' msg-in' : '')
     renderedIds.add(m.id)
-    card.innerHTML =
-      '<div class="msg-head">' +
-        '<span class="msg-avatar" style="background:' + av.color + '">' + esc(av.letter) + '</span>' +
-        '<span class="msg-app">' + esc(appName) + '</span>' +
-        (m.plain.device ? '<span class="msg-device">📱 ' + esc(m.plain.device) + '</span>' : '') +
-        (unread ? '<span class="badge-new">NUEVO</span>' : '') +
-        (isTest ? '<span class="badge-type">TEST</span>' : '') +
-        '<span class="msg-time">' + esc(fmtTime(t)) + '</span>' +
-      '</div>' +
-      '<div class="msg-title">' + esc(m.plain.title || '') + '</div>' +
-      '<div class="msg-text">' + esc(m.plain.text || '') + '</div>' +
+
+    if (pago) {
+      // ── Tarjeta FINANCIERA: billetera, monto y pagador ──
+      const w = walletInfo(m.plain.wallet || appName)
+      const monto = montoDe(m)
+      const pagador = m.plain.payer || m.plain.title || ''
+      card.innerHTML =
+        '<div class="msg-head">' +
+          '<span class="msg-avatar" style="background:' + w.color + '">' + esc(w.letter) + '</span>' +
+          '<span class="msg-app">' + esc(w.name) + '</span>' +
+          (unread ? '<span class="badge-new">NUEVO</span>' : '') +
+          (isTest ? '<span class="badge-type">TEST</span>' : '') +
+          '<span class="msg-time">' + esc(fmtTime(t)) + '</span>' +
+        '</div>' +
+        '<div class="msg-amount-row">' +
+          '<span class="msg-amount">S/ ' + (monto !== null ? Number(monto).toFixed(2) : '—') + '</span>' +
+          '<span class="msg-payer">' + esc(pagador || 'Pago recibido') + '</span>' +
+        '</div>' +
+        ((m.plain.text && m.plain.text !== pagador)
+          ? '<div class="msg-text">' + esc(m.plain.text) + '</div>' : '')
+    } else {
+      // ── Tarjeta SPAM: notificación que NO es pago ──
+      const av = avatarFor(appName)
+      card.innerHTML =
+        '<div class="msg-head">' +
+          '<span class="msg-avatar" style="background:' + av.color + '">' + esc(av.letter) + '</span>' +
+          '<span class="msg-app">' + esc(appName) + '</span>' +
+          '<span class="badge-type spam-badge">OTRO</span>' +
+          (unread ? '<span class="badge-new">NUEVO</span>' : '') +
+          '<span class="msg-time">' + esc(fmtTime(t)) + '</span>' +
+        '</div>' +
+        '<div class="msg-title">' + esc(m.plain.title || '') + '</div>' +
+        '<div class="msg-text">' + esc(m.plain.text || '') + '</div>'
+    }
+
+    card.innerHTML +=
       '<div class="msg-actions">' +
         '<button data-act="copy">Copiar</button>' +
         '<button data-act="del">Borrar</button>' +
@@ -477,24 +579,43 @@ function renderFeed () {
     feed.appendChild(card)
   }
 
+  updateTodayStrip()
+
   const unreadTotal = [...state.msgs.values()].filter(m => m.plain && m.id > state.lastRead).length
   document.title = (unreadTotal > 0 ? '(' + unreadTotal + ') ' : '') + 'VerificaPE · Panel web'
 }
 
 function renderAppFilter () {
-  const sel = $('#app-filter')
-  const current = sel.value
+  const box = $('#app-filter')
+  if (!box) return
   const apps = new Map()
   for (const m of state.msgs.values()) {
     if (!m.plain) continue
     const a = m.plain.app || m.plain.pkg || 'App'
     apps.set(a, (apps.get(a) || 0) + 1)
   }
-  sel.innerHTML = '<option value="">Todas las apps</option>' +
+  const todas = state.filterApps.size === 0
+  box.innerHTML =
+    '<button class="achip' + (todas ? ' on' : '') + '" data-app="">Todas</button>' +
     [...apps.keys()].sort().map(a =>
-      '<option' + (a === current ? ' selected' : '') + ' value="' + esc(a) + '">' +
-      esc(a) + ' (' + apps.get(a) + ')</option>').join('')
-  if (current && apps.has(current)) sel.value = current
+      '<button class="achip' + (state.filterApps.has(a) ? ' on' : '') +
+      '" data-app="' + esc(a) + '">' + esc(a) + '</button>'
+    ).join('')
+
+  box.querySelectorAll('.achip').forEach(ch => {
+    ch.onclick = () => {
+      const a = ch.dataset.app
+      if (!a) {
+        state.filterApps.clear()               // «Todas» = sin filtro
+      } else if (state.filterApps.has(a)) {
+        state.filterApps.delete(a)             // multiselección: alternar
+      } else {
+        state.filterApps.add(a)
+      }
+      renderAppFilter()
+      renderFeed()
+    }
+  })
 }
 
 function renderStats () {
@@ -531,6 +652,18 @@ function renderPairView () {
   const p = state.pair
   if (!p) return
   $('#server-url').value = serverUrl()
+
+  // Origen de la URL que usa el QR: manual (dominio propio) o automática
+  const manual = !!localStorage.getItem(LS.server)
+  const nota = $('#url-source-note')
+  if (nota) {
+    nota.textContent = manual
+      ? '⚙️ Dominio manual ACTIVO: el QR apunta SIEMPRE a esta URL.'
+      : (state.tunnelUrl
+          ? '🌐 Automática (túnel): ' + state.tunnelUrl
+          : '📍 Automática: ' + location.origin)
+  }
+
   $('#pair-string').value = buildPairString()
   $('#channel-id').textContent = p.channel
   renderQR()
@@ -732,7 +865,16 @@ function startPolling () {
 
 function bindEvents () {
   $('#search').addEventListener('input', renderFeed)
-  $('#app-filter').addEventListener('change', renderFeed)
+
+  // Filtro Pagos / Spam / Todo
+  document.querySelectorAll('.kchip').forEach(b => {
+    b.onclick = () => {
+      state.kindFilter = b.dataset.kind
+      document.querySelectorAll('.kchip').forEach(x =>
+        x.classList.toggle('active', x === b))
+      renderFeed()
+    }
+  })
 
   $('#btn-refresh').onclick = pull
   $('#btn-read-all').onclick = () => {
@@ -743,12 +885,23 @@ function bindEvents () {
   }
 
   $('#server-url').addEventListener('change', () => {
-    const v = $('#server-url').value.trim().replace(/\/+$/, '')
+    let v = $('#server-url').value.trim().replace(/\/+$/, '')
+    if (v && !v.startsWith('http')) {
+      toast('La URL debe empezar con http:// o https://')
+      $('#server-url').value = serverUrl()
+      return
+    }
     if (!v) return
     localStorage.setItem(LS.server, v)
     renderPairView()
-    toast('URL del servidor actualizada')
+    toast('Dominio del servidor actualizado')
   })
+
+  $('#btn-url-auto').onclick = () => {
+    localStorage.removeItem(LS.server)
+    renderPairView()
+    toast('URL automática restaurada')
+  }
 
   $('#btn-copy').onclick = async () => {
     try {
