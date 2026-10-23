@@ -452,17 +452,25 @@ function updateTodayStrip () {
 
 /* ─────────────────── render ─────────────────── */
 
+/** Iconos SVG del indicador de conexión. */
+const PILL_ICONS = {
+  live: '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 4.5 13.5H11L9.5 22 19 10h-6.5L13 2z"/></svg>',
+  ok: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2"><circle cx="12" cy="12" r="7"/></svg>',
+  off: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 1 21h23L12 2z"/><path d="M12 9.5v4.5M12 17.4v.4"/></svg>'
+}
+
 function setOnline (ok, mode) {
   const pill = $('#conn-pill')
+  if (!pill) return
   if (!ok) {
     pill.className = 'pill offline'
-    pill.textContent = '○ Sin conexión'
+    pill.innerHTML = PILL_ICONS.off + ' Sin conexión'
   } else if (mode === 'live') {
     pill.className = 'pill live'
-    pill.textContent = '⚡ En vivo'
+    pill.innerHTML = PILL_ICONS.live + ' En vivo'
   } else {
     pill.className = 'pill online'
-    pill.textContent = '● Conectado'
+    pill.innerHTML = PILL_ICONS.ok + ' Conectado'
   }
 }
 

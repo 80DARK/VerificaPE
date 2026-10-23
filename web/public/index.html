@@ -116,23 +116,30 @@
           <p class="muted">Después activa app por app cuáles quieres monitorear
              (en «Apps monitoreadas», todo está desactivado por defecto).</p>
 
-          <label class="field-label" for="server-url">Dirección del servidor que verá el teléfono
-            <input id="server-url" type="text" spellcheck="false">
-          </label>
-          <p id="url-source-note" class="muted tiny"></p>
-          <div class="row">
-            <button id="btn-url-auto" class="secondary">↺ Usar URL automática</button>
+          <!-- ══════════ TU DOMINIO / TÚNEL ══════════ -->
+          <div class="card">
+            <h3>🌐 Tu dominio o túnel</h3>
+            <p class="muted tiny">El QR de abajo apunta SIEMPRE a la URL que pongas aquí
+               (así se configura el dominio: escribes la tuya y listo, no hay que
+               suplantar a Google 😄).</p>
+            <label class="field-label" for="server-url">URL del servidor que verá tu teléfono
+              <input id="server-url" type="text" placeholder="https://caja.tudominio.com" spellcheck="false">
+            </label>
+            <p id="url-source-note" class="muted tiny"></p>
+            <div class="row">
+              <button id="btn-url-auto" class="secondary">↺ Usar URL automática</button>
+            </div>
+            <p class="muted tiny">
+              • <b>Túnel rápido (gratis)</b>: la URL cambia cada vez que reinicias el PC.
+              Copia la nueva de <code>docker compose logs tunnel</code> y pégala arriba,
+              o abre el panel desde esa dirección https://…trycloudflare.com.<br>
+              • <b>Tu propio dominio (recomendado)</b>: en Cloudflare Zero Trust crea un túnel
+              con nombre, pon su <code>TUNNEL_TOKEN</code> en <code>web/.env</code> (los pasos
+              están ahí) y escribe tu dominio una sola vez:
+              <b>el QR nunca cambia y no vuelves a escanear</b>.
+            </p>
+            <p id="tunnel-note" class="muted tiny hidden"></p>
           </div>
-          <p class="muted tiny">⚙️ <b>Dominio propio (recomendado)</b>: si tienes un dominio
-             fijo (ej. <code>https://caja.tudominio.com</code> apuntando a este servidor con
-             un túnel de Cloudflare con nombre), ponlo aquí: el QR apuntará siempre a él y
-             <b>nunca más tendrás que re-escanear</b> aunque reinicies el servidor.
-             Si usas el túnel rápido (URL cambia), pega la nueva URL aquí o abre el panel
-             desde esa dirección para que el QR la tome solo.</p>
-          <p id="tunnel-note" class="muted tiny hidden"></p>
-          <p class="muted tiny">Si usas <code>start.ps1</code> o el <code>docker compose --profile tunnel</code>,
-             el túnel gratuito de Cloudflare se configura solo y el QR apunta a la URL pública
-             <code>https://…trycloudflare.com</code>. También puedes poner a mano la IP local o tu propia URL.</p>
 
           <div class="qr-wrap">
             <div id="qr"></div>

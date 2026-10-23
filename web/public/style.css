@@ -52,7 +52,7 @@ body {
   color: var(--text);
   font-size: 15px;
   overflow: hidden;
-  background: linear-gradient(135deg, var(--bg-1) 0%, var(--bg-2) 52%, var(--bg-3) 100%) fixed;
+  background: linear-gradient(135deg, var(--bg-1) 0%, var(--bg-2) 52%, var(--bg-3) 100%);
 }
 
 .hidden { display: none !important; }
@@ -60,14 +60,13 @@ body {
 .tiny { font-size: 12.5px; line-height: 1.55; }
 code { background: var(--glass-strong); padding: 1px 6px; border-radius: 6px; font-size: 12px; color: var(--money); }
 
-/* ══════════════ Vidrio base ══════════════ */
+/* ══════════════ Vidrio base ══════════════
+   El blur (backdrop-filter) es CARO en GPU: solo se usa en sidebar, topbar
+   y el strip de ingresos; las tarjetas usan vidrio translúcido sin blur. */
 .glass {
   background: var(--glass);
   border: 1px solid var(--stroke-soft);
   border-radius: var(--radius);
-  backdrop-filter: blur(16px) saturate(140%);
-  -webkit-backdrop-filter: blur(16px) saturate(140%);
-  box-shadow: 0 8px 32px rgba(10, 6, 32, 0.35);
 }
 
 /* ══════════════ Layout ══════════════ */
@@ -210,6 +209,9 @@ body[data-theme="light"] .nav-item.active { color: #fff; }
   border: 1px solid var(--stroke);
   white-space: nowrap;
   letter-spacing: .2px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 .pill.online  { color: var(--money); border-color: var(--money); background: var(--money-soft); }
 .pill.offline { color: var(--warn); border-color: var(--warn); background: rgba(251,191,36,.10); }
@@ -244,6 +246,9 @@ main::-webkit-scrollbar-track { background: transparent; }
   gap: 14px;
   padding: 16px 20px;
   margin-bottom: 14px;
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  box-shadow: 0 8px 32px rgba(10, 6, 32, 0.35);
 }
 .ts-main { display: flex; flex-direction: column; gap: 2px; }
 .ts-label { font-size: 11px; letter-spacing: .14em; color: var(--text-soft); font-weight: 700; }
@@ -361,9 +366,6 @@ button.danger:hover { background: rgba(248, 113, 113, 0.10); filter: none; }
   border-radius: var(--radius);
   padding: 18px;
   margin-bottom: 16px;
-  backdrop-filter: blur(16px) saturate(140%);
-  -webkit-backdrop-filter: blur(16px) saturate(140%);
-  box-shadow: 0 8px 32px rgba(10, 6, 32, 0.28);
 }
 .card h2 { font-size: 17px; margin-bottom: 12px; }
 .card h3 { font-size: 15px; margin-bottom: 10px; }
@@ -435,8 +437,6 @@ button.danger:hover { background: rgba(248, 113, 113, 0.10); filter: none; }
   border-radius: 16px;
   padding: 13px 15px;
   position: relative;
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
   transition: border-color .15s, box-shadow .15s, transform .15s;
 }
 .msg-in { animation: msgIn .22s ease; }
@@ -507,7 +507,6 @@ body[data-theme="light"] .badge-new { color: #fff; }
 .stat-card {
   background: var(--glass); border: 1px solid var(--stroke-soft);
   border-radius: var(--radius); padding: 16px; text-align: center;
-  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
 }
 .stat-card .num { font-size: 30px; font-weight: 800; color: var(--money-strong); }
 .stat-card .lbl { font-size: 12px; color: var(--text-soft); margin-top: 2px; }
