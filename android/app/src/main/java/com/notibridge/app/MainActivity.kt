@@ -14,6 +14,7 @@ import com.notibridge.app.ui.HomeFragment
 import com.notibridge.app.ui.HistoryFragment
 import com.notibridge.app.ui.PairFragment
 import com.notibridge.app.ui.SettingsFragment
+import com.notibridge.app.ui.SpamFragment
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
@@ -79,6 +80,7 @@ class MainActivity : AppCompatActivity() {
     fun navigateTo(menuId: Int) {
         val (fragment: Fragment, titleRes: Int) = when (menuId) {
             R.id.nav_home -> HomeFragment() to R.string.menu_home
+            R.id.nav_spam -> SpamFragment() to R.string.menu_spam
             R.id.nav_apps -> AppsFragment() to R.string.menu_apps
             R.id.nav_pair -> PairFragment() to R.string.menu_pair
             R.id.nav_history -> HistoryFragment() to R.string.menu_history

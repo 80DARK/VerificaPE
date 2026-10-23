@@ -36,8 +36,14 @@ class NotiListenerService : NotificationListenerService() {
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
-        // Nunca nos miramos a nosotros mismos
-        if (sbn.packageName == packageName) return
+        val n = sbn.notification ?: return
+
+        // Nuestras propias notificaciones solo pasan si son la PRUEBA DEL LECTOR
+        val selfTest = sbn.packageName == packageName
+        if (selfTest) {
+            val t = n.extras?.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
+            if (!t.contains("[VPE-TEST]")) return
+        }
 
         // MODO DORMIR: si el dueño apagó la escucha, ignorar TODO
         // (sin leer, sin guardar, sin enviar). Se reactiva con el botón de Inicio.
@@ -62,19 +68,25 @@ class NotiListenerService : NotificationListenerService() {
 
     private suspend fun processInner(sbn: StatusBarNotification) {
         val notification: Notification = sbn.notification ?: return
+        val selfTest = sbn.packageName == packageName
 
         // Opción: ignorar notificaciones "en curso" (música, llamadas, navegación)
         val prefs = Prefs.get(this)
-        if (prefs.getBoolean(Prefs.IGNORE_ONGOING, true) &&
+        if (!selfTest &&
+            prefs.getBoolean(Prefs.IGNORE_ONGOING, true) &&
             (notification.flags and Notification.FLAG_ONGOING_EVENT) != 0
         ) return
 
-        // Resúmenes de grupo (duplicados) -> fuera
-        if ((notification.flags and Notification.FLAG_GROUP_SUMMARY) != 0) return
+        // v1.3.1: los resúmenes de grupo YA SE PROCESAN (algunas billeteras
+        // solo publican el contenido en el resumen). Los duplicados se
+        // eliminan abajo con deduplicación por texto en 15 s.
 
         val db = AppDatabase.get(this)
-        val monitored = db.apps().get(sbn.packageName) ?: return
-        if (!monitored.enabled) return
+        val monitored = if (selfTest) null else db.apps().get(sbn.packageName)
+        if (!selfTest) {
+            if (monitored == null) return
+            if (!monitored.enabled) return
+        }
 
         val extras = notification.extras ?: return
         val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: ""
@@ -84,12 +96,24 @@ class NotiListenerService : NotificationListenerService() {
             Notification.EXTRA_SUB_TEXT
         ).firstNotNullOfOrNull { extras.getCharSequence(it)?.toString() } ?: ""
 
-        val appName = try {
-            packageManager.getApplicationLabel(
-                packageManager.getApplicationInfo(sbn.packageName, 0)
-            ).toString()
-        } catch (e: Exception) {
-            monitored.appName
+        val appName = if (selfTest) {
+            "VerificaPE"
+        } else {
+            try {
+                packageManager.getApplicationLabel(
+                    packageManager.getApplicationInfo(sbn.packageName, 0)
+                ).toString()
+            } catch (e: Exception) {
+                monitored?.appName ?: sbn.packageName
+            }
+        }
+
+        // Deduplicación (resumen de grupo + hija traen el mismo texto)
+        if (text.isNotBlank()) {
+            val dupes = db.logs().countRecentSameText(
+                sbn.packageName, System.currentTimeMillis() - 15000, text
+            )
+            if (dupes > 0) return
         }
 
         // ---- Filtro OTP (siempre activo) ----

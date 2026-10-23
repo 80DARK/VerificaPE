@@ -6,6 +6,7 @@
 
     <!-- Menú lateral -->
     <string name="menu_home">Inicio</string>
+    <string name="menu_spam">Spam</string>
     <string name="menu_apps">Apps monitoreadas</string>
     <string name="menu_pair">Emparejar</string>
     <string name="menu_history">Historial local</string>
@@ -32,6 +33,18 @@
     <string name="export_empty">No hay pagos para exportar</string>
     <string name="export_title">Exportar pagos</string>
     <string name="export_error">No se pudo exportar el CSV</string>
+
+    <!-- Spam (diagnóstico de descartes) -->
+    <string name="spam_intro">Aquí ves lo que la app capturó pero NO clasificó como pago (promos, mensajes genéricos y bloqueos OTP). Si un pago real aparece aquí, pulsa «✓ Es pago» para corregirlo.</string>
+    <string name="spam_empty">Nada descartado por ahora.\n\nSi tampoco te llegan pagos: pulsa «Probar lector». Si la prueba no aparece aquí en unos segundos, el problema es el acceso a notificaciones (ábrela en Ajustes del sistema y reactiva VerificaPE).</string>
+    <string name="test_lector">🔔 Probar lector</string>
+    <string name="test_lector_toast">Notificación de prueba enviada. Si el lector funciona, aparecerá aquí en segundos.</string>
+    <string name="btn_es_pago">✓ Es pago</string>
+    <string name="spam_otp_locked">🔒 Bloqueada por política OTP (el contenido no se guardó)</string>
+    <string name="spam_no_amount">No se detectó un monto «S/» en ese mensaje: no se puede marcar como pago</string>
+    <string name="spam_marked">Marcado como pago ✔ (ya suma en tus ingresos)</string>
+    <string name="spam_delete_desc">Eliminar este descarte</string>
+    <string name="no_notif_permission">Concede el permiso de notificaciones para poder publicar la prueba</string>
     <string name="access_card_title">Acceso a notificaciones</string>
     <string name="service_on">● Servicio activo: escuchando notificaciones</string>
     <string name="service_off">● Sin acceso: concede el permiso en Ajustes del sistema</string>

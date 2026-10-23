@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:background="@drawable/glass_card"
+    android:layout_marginTop="8dp"
+    android:padding="12dp">
+
+    <TextView
+        android:id="@+id/spam_badge"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:gravity="center"
+        android:background="@drawable/badge_circle"
+        android:textSize="15sp"
+        android:textStyle="bold"
+        android:textColor="@color/white" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginStart="12dp"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/spam_titulo"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:textColor="@color/text_main" />
+
+        <TextView
+            android:id="@+id/spam_texto"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="1dp"
+            android:textSize="12sp"
+            android:maxLines="2"
+            android:ellipsize="end"
+            android:textColor="@color/text_soft" />
+
+        <TextView
+            android:id="@+id/spam_hora"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:textSize="10sp"
+            android:textColor="@color/text_soft" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/spam_btn_pago"
+        style="@style/ChipFiltro"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="6dp"
+        android:text="@string/btn_es_pago" />
+
+    <ImageButton
+        android:id="@+id/spam_btn_borrar"
+        android:layout_width="34dp"
+        android:layout_height="34dp"
+        android:background="@drawable/chip_filter"
+        android:src="@android:drawable/ic_menu_delete"
+        android:scaleType="centerInside"
+        android:padding="7dp"
+        android:contentDescription="@string/spam_delete_desc" />
+</LinearLayout>

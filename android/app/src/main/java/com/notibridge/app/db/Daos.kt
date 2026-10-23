@@ -2,7 +2,6 @@ package com.notibridge.app.db
 
 import androidx.room.Dao
 import androidx.room.Insert
-import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Upsert
 
@@ -81,6 +80,27 @@ interface NotificationLogDao {
 
     @Query("SELECT COUNT(*) FROM notification_logs WHERE isPayment = 1 AND loggedAt >= :since")
     suspend fun paymentsCountSince(since: Long): Int
+
+    // ── Sección Spam (diagnóstico de descartes) ──
+    @Query("SELECT * FROM notification_logs WHERE isPayment = 0 ORDER BY loggedAt DESC LIMIT :limit")
+    suspend fun nonPayments(limit: Int): List<NotificationLogEntity>
+
+    /** El usuario corrige a mano un pago que el filtro descartó. */
+    @Query(
+        "UPDATE notification_logs SET isPayment = 1, amount = :amount, payerName = :payer, " +
+        "wallet = :wallet WHERE id = :id"
+    )
+    suspend fun markAsPayment(id: Long, amount: Double, payer: String?, wallet: String)
+
+    @Query("DELETE FROM notification_logs WHERE id = :id")
+    suspend fun deleteById(id: Long)
+
+    /** Deduplicación: mismo texto del mismo paquete en los últimos 15 s. */
+    @Query(
+        "SELECT COUNT(*) FROM notification_logs WHERE packageName = :pkg " +
+        "AND loggedAt >= :desde AND text = :text"
+    )
+    suspend fun countRecentSameText(pkg: String, desde: Long, text: String): Int
 }
 
 @Dao
