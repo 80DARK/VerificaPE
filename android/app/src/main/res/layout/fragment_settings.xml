@@ -49,6 +49,11 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="@string/sw_history_label" />
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/sw_payments_only"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/sw_payments_only_label" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 

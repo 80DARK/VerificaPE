@@ -1,11 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Tema base con Material 3 (sin ActionBar; usamos MaterialToolbar propia) -->
-    <style name="Theme.NotiBridge" parent="Theme.Material3.DayNight.NoActionBar">
+    <!-- Tema oscuro financiero fijo (glassmorphism sobre degradado) -->
+    <style name="Theme.NotiBridge" parent="Theme.Material3.Dark.NoActionBar">
         <item name="colorPrimary">@color/primary</item>
         <item name="colorOnPrimary">@color/white</item>
         <item name="colorPrimaryContainer">@color/primary_dark</item>
-        <item name="android:statusBarColor">?attr/colorSurface</item>
-        <item name="android:windowLightStatusBar">true</item>
+        <item name="colorSurface">@color/surface_solid</item>
+        <item name="colorOnSurface">@color/text_main</item>
+        <item name="android:windowBackground">@drawable/bg_gradient</item>
+        <item name="android:statusBarColor">@color/status_top</item>
+        <item name="android:navigationBarColor">@color/surface_solid</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+
+    <!-- Chip de filtro de fecha (píldora glass) -->
+    <style name="ChipFiltro">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:paddingTop">8dp</item>
+        <item name="android:paddingBottom">8dp</item>
+        <item name="android:paddingStart">14dp</item>
+        <item name="android:paddingEnd">14dp</item>
+        <item name="android:layout_marginEnd">8dp</item>
+        <item name="android:background">@drawable/chip_filter</item>
+        <item name="android:textColor">@color/text_main</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
     </style>
 </resources>

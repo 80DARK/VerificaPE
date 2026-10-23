@@ -1,43 +1,148 @@
 package com.notibridge.app.ui
 
+import android.content.ComponentName
 import android.content.Intent
 import android.os.Bundle
 import android.provider.Settings
+import android.view.LayoutInflater
 import android.view.View
-import android.widget.Button
+import android.view.ViewGroup
 import android.widget.ImageButton
 import android.widget.TextView
 import android.widget.Toast
+import androidx.core.content.FileProvider
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.notibridge.app.db.AppDatabase
 import com.notibridge.app.MainActivity
 import com.notibridge.app.NotiAccess
+import com.notibridge.app.NotiListenerService
 import com.notibridge.app.Prefs
 import com.notibridge.app.R
+import com.notibridge.app.Sender
+import com.notibridge.app.Wallets
+import com.notibridge.app.db.AppDatabase
+import com.notibridge.app.db.NotificationLogEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import java.io.File
+import java.text.NumberFormat
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
 /**
- * Pantalla de inicio: estado del servicio, estado del emparejamiento,
- * contadores y las notificaciones más recientes.
+ * Pantalla de inicio FINANCIERA (glassmorphism):
+ *  - Tarjeta de INGRESOS DE HOY (total S/ y cantidad de pagos)
+ *  - Botón circular para dormir/despertar la escucha (con reenganche forzado
+ *    al despertar: corrige el bug en que el sistema no volvía a entregar
+ *    notificaciones tras dormir el servicio)
+ *  - Historial de pagos AGRUPADO POR DÍA con monto, pagador, hora y billetera
+ *  - Filtro por fechas (Hoy / 7 días / Mes / Todo) y EXPORTACIÓN CSV (Excel)
  */
 class HomeFragment : Fragment(R.layout.fragment_home) {
 
-    private lateinit var serviceStatus: TextView
-    private lateinit var pairStatus: TextView
-    private lateinit var statToday: TextView
-    private lateinit var statSent: TextView
-    private lateinit var statOtp: TextView
-    private lateinit var recentAdapter: NotificationAdapter
-    private lateinit var emptyRecent: TextView
     private lateinit var powerBtn: ImageButton
     private lateinit var listeningStatus: TextView
+    private lateinit var incomeTotal: TextView
+    private lateinit var incomeCount: TextView
+    private lateinit var statusLine: TextView
+    private lateinit var pagosAdapter: PagosAdapter
 
-    /** Pinta el botón circular según el estado del modo escucha. */
+    private var filtroActual = FILTRO_HOY
+    private var listaPagos: List<NotificationLogEntity> = emptyList()
+
+    private val moneyFormat: NumberFormat =
+        NumberFormat.getNumberInstance(Locale("es", "PE")).apply {
+            maximumFractionDigits = 2
+            minimumFractionDigits = 2
+        }
+
+    // ─────────────────── ciclo de vida ───────────────────
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        powerBtn = view.findViewById(R.id.btn_power)
+        listeningStatus = view.findViewById(R.id.listening_status)
+        incomeTotal = view.findViewById(R.id.income_total)
+        incomeCount = view.findViewById(R.id.income_count)
+        statusLine = view.findViewById(R.id.status_line)
+
+        // Botón circular de encendido / dormir
+        updateListeningUi()
+        powerBtn.setOnClickListener {
+            val prefs = Prefs.get(requireContext())
+            val nowOn = !prefs.getBoolean(Prefs.LISTENING, true)
+            prefs.edit().putBoolean(Prefs.LISTENING, nowOn).apply()
+            updateListeningUi()
+            if (nowOn) despertarServicio()
+            Toast.makeText(
+                requireContext(),
+                if (nowOn) R.string.listening_on_toast else R.string.listening_off_toast,
+                Toast.LENGTH_LONG
+            ).show()
+        }
+
+        // Historial de pagos agrupado por día
+        pagosAdapter = PagosAdapter()
+        view.findViewById<RecyclerView>(R.id.pagos_list).apply {
+            layoutManager = LinearLayoutManager(requireContext())
+            adapter = pagosAdapter
+        }
+
+        // Estado de acceso/notificaciones: tocar abre los ajustes del sistema
+        statusLine.setOnClickListener {
+            startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+        }
+
+        // Filtros de fecha
+        listOf(
+            R.id.chip_hoy to FILTRO_HOY,
+            R.id.chip_7dias to FILTRO_7DIAS,
+            R.id.chip_mes to FILTRO_MES,
+            R.id.chip_todo to FILTRO_TODO
+        ).forEach { (id, filtro) ->
+            view.findViewById<TextView>(id).setOnClickListener {
+                filtroActual = filtro
+                pintarChips()
+                cargarPagos()
+            }
+        }
+        pintarChips()
+
+        // Exportar CSV (Excel)
+        view.findViewById<TextView>(R.id.btn_export).setOnClickListener { exportarCsv() }
+
+        // Botón "Probar" del canal: envía un pago de prueba
+        view.findViewById<TextView>(R.id.btn_test_pago).setOnClickListener { enviarPagoPrueba() }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        updateListeningUi()
+        cargarPagos()
+    }
+
+    // ─────────────────── despertar con reenganche ───────────────────
+
+    /**
+     * FIX del bug "duermo y despierto y ya no escucha": al despertar pedimos
+     * explícitamente al sistema que (re)enganchen el lector de notificaciones.
+     * Cubre el caso en que el sistema desenganchara el servicio por su cuenta.
+     */
+    private fun despertarServicio() {
+        try {
+            android.service.notification.NotificationListenerService.requestRebind(
+                ComponentName(requireContext(), NotiListenerService::class.java)
+            )
+        } catch (e: Exception) {
+            // mejor esfuerzo: el sistema igual debería seguir entregando
+        }
+    }
+
     private fun updateListeningUi() {
         val on = Prefs.get(requireContext()).getBoolean(Prefs.LISTENING, true)
         powerBtn.isActivated = on
@@ -46,88 +151,239 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
         )
     }
 
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        serviceStatus = view.findViewById(R.id.service_status)
-        pairStatus = view.findViewById(R.id.pair_status)
-        statToday = view.findViewById(R.id.stat_today)
-        statSent = view.findViewById(R.id.stat_sent)
-        statOtp = view.findViewById(R.id.stat_otp)
+    // ─────────────────── datos financieros ───────────────────
 
-        // Botón circular de encendido / dormir
-        powerBtn = view.findViewById(R.id.btn_power)
-        listeningStatus = view.findViewById(R.id.listening_status)
-        updateListeningUi()
-        powerBtn.setOnClickListener {
-            val prefs = Prefs.get(requireContext())
-            val nowOn = !prefs.getBoolean(Prefs.LISTENING, true)
-            prefs.edit().putBoolean(Prefs.LISTENING, nowOn).apply()
-            updateListeningUi()
-            Toast.makeText(
-                requireContext(),
-                if (nowOn) R.string.listening_on_toast else R.string.listening_off_toast,
-                Toast.LENGTH_LONG
-            ).show()
-        }
-
-        recentAdapter = NotificationAdapter()
-        emptyRecent = view.findViewById(R.id.empty_recent)
-        view.findViewById<RecyclerView>(R.id.recent_list).apply {
-            layoutManager = LinearLayoutManager(requireContext())
-            adapter = recentAdapter
-        }
-
-        view.findViewById<Button>(R.id.btn_grant_access).setOnClickListener {
-            startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
-        }
-        view.findViewById<Button>(R.id.btn_go_pair).setOnClickListener {
-            (requireActivity() as MainActivity).navigateTo(R.id.nav_pair)
-        }
-        view.findViewById<Button>(R.id.btn_go_history).setOnClickListener {
-            (requireActivity() as MainActivity).navigateTo(R.id.nav_history)
-        }
+    private fun inicioDeHoy(): Long {
+        val cal = Calendar.getInstance()
+        cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0)
+        cal.set(Calendar.SECOND, 0); cal.set(Calendar.MILLISECOND, 0)
+        return cal.timeInMillis
     }
 
-    override fun onResume() {
-        super.onResume()
-        refresh()
+    private fun rangoFiltro(): Long = when (filtroActual) {
+        FILTRO_HOY -> inicioDeHoy()
+        FILTRO_7DIAS -> System.currentTimeMillis() - 7L * 24 * 60 * 60 * 1000
+        FILTRO_MES -> {
+            val cal = Calendar.getInstance()
+            cal.set(Calendar.DAY_OF_MONTH, 1)
+            cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0)
+            cal.set(Calendar.SECOND, 0); cal.set(Calendar.MILLISECOND, 0)
+            cal.timeInMillis
+        }
+        else -> 0L
     }
 
-    private fun refresh() {
+    private fun cargarPagos() {
         val appCtx = requireContext().applicationContext
-        val serviceOk = NotiAccess.isEnabled(appCtx)
-        serviceStatus.text = if (serviceOk) {
-            getString(R.string.service_on)
-        } else {
-            getString(R.string.service_off)
-        }
-        serviceStatus.setTextColor(
-            resources.getColor(
-                if (serviceOk) android.R.color.holo_green_dark
-                else android.R.color.holo_orange_dark,
-                requireContext().theme
-            )
-        )
-
-        viewLifecycleOwner.lifecycleScope.launch {
+        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
             val db = AppDatabase.get(appCtx)
-            val startOfDay = System.currentTimeMillis() - 24L * 60 * 60 * 1000
-            val channelCount = db.pairing().count()
-            val today = db.logs().countSince(startOfDay)
-            val sent = db.logs().countSent()
+            val inicio = inicioDeHoy()
+            val totalHoy = db.logs().incomeSince(inicio)
+            val countHoy = db.logs().paymentsCountSince(inicio)
+            val pagos = db.logs().paymentsSince(rangoFiltro(), 1000)
+            val canales = db.pairing().count()
             val otp = db.logs().countIgnored()
-            val recent = db.logs().recent(5)
+            val acceso = NotiAccess.isEnabled(appCtx)
+
             withContext(Dispatchers.Main) {
                 if (!isAdded) return@withContext
-                pairStatus.text = if (channelCount > 0) {
-                    getString(R.string.paired_channels, channelCount)
-                } else {
-                    getString(R.string.not_paired)
+                incomeTotal.text = "S/ ${moneyFormat.format(totalHoy)}"
+                incomeCount.text = getString(R.string.income_count_fmt, countHoy)
+                statusLine.text = buildString {
+                    append(if (acceso) "✓ Acceso " else "⚠ Sin acceso · ")
+                    append(getString(R.string.canal_count, canales))
+                    append(" · ")
+                    append(getString(R.string.otp_blocked_count, otp))
                 }
-                statToday.text = today.toString()
-                statSent.text = sent.toString()
-                statOtp.text = otp.toString()
-                recentAdapter.submit(recent)
-                emptyRecent.visibility = if (recent.isEmpty()) View.VISIBLE else View.GONE
+                listaPagos = pagos
+                pagosAdapter.submit(pagos)
+                view?.findViewById<TextView>(R.id.pagos_empty)?.visibility =
+                    if (pagos.isEmpty()) View.VISIBLE else View.GONE
+            }
+        }
+    }
+
+    private fun pintarChips() {
+        listOf(
+            R.id.chip_hoy to FILTRO_HOY,
+            R.id.chip_7dias to FILTRO_7DIAS,
+            R.id.chip_mes to FILTRO_MES,
+            R.id.chip_todo to FILTRO_TODO
+        ).forEach { (id, filtro) ->
+            view?.findViewById<TextView>(id)?.isActivated = (filtro == filtroActual)
+        }
+    }
+
+    // ─────────────────── CSV (Excel) ───────────────────
+
+    private fun exportarCsv() {
+        if (listaPagos.isEmpty()) {
+            Toast.makeText(requireContext(), R.string.export_empty, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val appCtx = requireContext().applicationContext
+        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val dir = File(appCtx.cacheDir, "exports").apply { mkdirs() }
+                val archivo = File(dir, "verificape_pagos_${SimpleDateFormat("yyyyMMdd_HHmm", Locale.US).format(Date())}.csv")
+                archivo.writeText(generarCsv(), Charsets.UTF_8)
+                val uri = FileProvider.getUriForFile(appCtx, "${appCtx.packageName}.fileprovider", archivo)
+                withContext(Dispatchers.Main) {
+                    if (!isAdded) return@withContext
+                    val intent = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/csv"
+                        putExtra(Intent.EXTRA_STREAM, uri)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    startActivity(Intent.createChooser(intent, getString(R.string.export_title)))
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    if (isAdded) Toast.makeText(requireContext(), R.string.export_error, Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    private fun generarCsv(): String {
+        val fFecha = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+        val fHora = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+        val sb = StringBuilder()
+        sb.append("Fecha,Hora,Billetera,Pagador,Monto,App\n")
+        for (p in listaPagos) {
+            sb.append('"').append(fFecha.format(Date(p.loggedAt))).append("\",")
+            sb.append('"').append(fHora.format(Date(p.loggedAt))).append("\",")
+            sb.append('"').append(esc(p.wallet ?: p.appName)).append("\",")
+            sb.append('"').append(esc(p.payerName ?: "")).append("\",")
+            sb.append(moneyFormat.format(p.amount ?: 0.0)).append(",")
+            sb.append('"').append(esc(p.appName)).append("\"\n")
+        }
+        return sb.toString()
+    }
+
+    private fun esc(s: String) = s.replace("\"", "\"\"")
+
+    // ─────────────────── pago de prueba ───────────────────
+
+    private fun enviarPagoPrueba() {
+        val appCtx = requireContext().applicationContext
+        viewLifecycleOwner.lifecycleScope.launch {
+            val payload = JSONObject().apply {
+                put("v", 2)
+                put("type", "payment")
+                put("device", android.os.Build.MODEL)
+                put("app", "VerificaPE")
+                put("title", "Prueba")
+                put("text", "Pago de prueba desde la app VerificaPE")
+                put("time", System.currentTimeMillis())
+                put("amount", 1.00)
+                put("payer", "VerificaPE")
+                put("wallet", "Test")
+            }
+            val ok = Sender.send(appCtx, payload)
+            if (isAdded) {
+                Toast.makeText(
+                    requireContext(),
+                    if (ok) R.string.test_ok else R.string.test_fail,
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        }
+    }
+
+    companion object {
+        private const val FILTRO_HOY = 0
+        private const val FILTRO_7DIAS = 1
+        private const val FILTRO_MES = 2
+        private const val FILTRO_TODO = 3
+    }
+}
+
+/* ══════════════════ Historial de pagos por días ══════════════════ */
+
+sealed class FilaPago {
+    data class Dia(val titulo: String, val total: Double) : FilaPago()
+    data class Pago(val pago: NotificationLogEntity, val colorWallet: Int, val letra: Char) : FilaPago()
+}
+
+class PagosAdapter : RecyclerView.Adapter<PagosAdapter.VH>() {
+
+    private val filas = mutableListOf<FilaPago>()
+    private val fHora = SimpleDateFormat("HH:mm", Locale.getDefault())
+
+    fun submit(pagos: List<NotificationLogEntity>) {
+        filas.clear()
+
+        // Agrupar por día (ya vienen en DESC: más reciente primero)
+        val fDiaKey = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val porDia = LinkedHashMap<String, MutableList<FilaPago.Pago>>()
+        val etiquetas = HashMap<String, String>()
+        for (p in pagos) {
+            val key = fDiaKey.format(Date(p.loggedAt))
+            val w = Wallets.detect(p.wallet ?: p.appName)
+            porDia.getOrPut(key) { mutableListOf() }
+                .add(FilaPago.Pago(p, w.color, w.letter))
+            etiquetas[key] = etiquetaDia(p.loggedAt)
+        }
+        for ((key, items) in porDia) {
+            val total = items.sumOf { it.pago.amount ?: 0.0 }
+            filas.add(FilaPago.Dia(etiquetas[key] ?: key, total))
+            filas.addAll(items)
+        }
+        notifyDataSetChanged()
+    }
+
+    private fun etiquetaDia(ms: Long): String {
+        val cal = Calendar.getInstance()
+        val hoy = Calendar.getInstance()
+        cal.timeInMillis = ms
+        return when {
+            cal.get(Calendar.YEAR) == hoy.get(Calendar.YEAR) &&
+                cal.get(Calendar.DAY_OF_YEAR) == hoy.get(Calendar.DAY_OF_YEAR) -> "Hoy"
+            hoy.get(Calendar.DAY_OF_YEAR) - cal.get(Calendar.DAY_OF_YEAR) == 1 &&
+                hoy.get(Calendar.YEAR) == cal.get(Calendar.YEAR) -> "Ayer"
+            else -> SimpleDateFormat("EEEE d 'de' MMMM", Locale.getDefault()).format(Date(ms))
+                .replaceFirstChar { it.uppercase(Locale.getDefault()) }
+        }
+    }
+
+    class VH(view: View) : RecyclerView.ViewHolder(view) {
+        val diaTitulo: TextView = view.findViewById(R.id.dia_titulo)
+        val diaTotal: TextView = view.findViewById(R.id.dia_total)
+        val badge: TextView = view.findViewById(R.id.pago_badge)
+        val pagador: TextView = view.findViewById(R.id.pago_pagador)
+        val hora: TextView = view.findViewById(R.id.pago_hora)
+        val monto: TextView = view.findViewById(R.id.pago_monto)
+        val walletName: TextView = view.findViewById(R.id.pago_wallet)
+    }
+
+    override fun getItemViewType(position: Int): Int =
+        if (filas[position] is FilaPago.Dia) 0 else 1
+
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
+        val layout = if (viewType == 0) R.layout.item_dia else R.layout.item_pago
+        return VH(LayoutInflater.from(parent.context).inflate(layout, parent, false))
+    }
+
+    override fun getItemCount(): Int = filas.size
+
+    override fun onBindViewHolder(holder: VH, position: Int) {
+        val money = NumberFormat.getNumberInstance(Locale("es", "PE")).apply {
+            maximumFractionDigits = 2; minimumFractionDigits = 2
+        }
+        when (val fila = filas[position]) {
+            is FilaPago.Dia -> {
+                holder.diaTitulo.text = fila.titulo
+                holder.diaTotal.text = "S/ ${money.format(fila.total)}"
+            }
+            is FilaPago.Pago -> {
+                holder.pagador.text = fila.pago.payerName ?: holder.itemView.context.getString(R.string.pago_sin_nombre)
+                holder.hora.text = fHora.format(Date(fila.pago.loggedAt))
+                holder.monto.text = "S/ ${money.format(fila.pago.amount ?: 0.0)}"
+                holder.walletName.text = fila.pago.wallet ?: fila.pago.appName
+                holder.badge.text = fila.letra.toString()
+                holder.badge.backgroundTintList =
+                    android.content.res.ColorStateList.valueOf(fila.colorWallet)
             }
         }
     }

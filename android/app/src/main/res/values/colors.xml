@@ -1,9 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="primary">#4F46E5</color>
-    <color name="primary_dark">#3730A3</color>
+    <color name="primary">#22C55E</color>
+    <color name="primary_dark">#15803D</color>
     <color name="white">#FFFFFF</color>
-    <color name="launcher_bg">#1E1B4B</color>
+    <color name="launcher_bg">#14102B</color>
     <color name="text_secondary">#64748B</color>
-    <color name="badge_otp">#B91C1C</color>
+    <color name="badge_otp">#F87171</color>
+
+    <!-- Paleta financiera glassmorphism -->
+    <color name="text_main">#F1EEFF</color>
+    <color name="text_soft">#B9B4D6</color>
+    <color name="money_green">#34D399</color>
+    <color name="surface_solid">#1A1633</color>
+    <color name="status_top">#14102B</color>
 </resources>

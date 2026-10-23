@@ -4,6 +4,7 @@ import android.app.Notification
 import android.os.Build
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
+import android.util.Log
 import com.notibridge.app.db.AppDatabase
 import com.notibridge.app.db.NotificationLogEntity
 import kotlinx.coroutines.CoroutineScope
@@ -14,16 +15,25 @@ import kotlinx.coroutines.launch
 /**
  * Servicio que escucha las notificaciones del dispositivo.
  *
- * Reglas de NotiBridge:
+ * Reglas de VerificaPE:
  *  - Solo se procesan las notificaciones de apps ACTIVADAS por el usuario
  *    (por defecto ninguna lo está).
  *  - Las notificaciones de la app de SMS y las que parecen códigos OTP se
  *    IGNORAN SIEMPRE (solo queda constancia del bloqueo, sin contenido).
+ *  - Las notificaciones se analizan con [PaymentFilter]: los PAGOS reales
+ *    quedan registrados con monto, pagador y billetera; las promos no cuentan.
  *  - Lo que se envía a la web viaja cifrado de extremo a extremo.
+ *  - MODO DORMIR: el botón circular de Inicio suspende la lectura al instante.
  */
 class NotiListenerService : NotificationListenerService() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    /** El sistema nos reenganchó (arranque, tras actualización, tras OEM). */
+    override fun onListenerConnected() {
+        super.onListenerConnected()
+        Log.i(TAG, "Listener conectado (reenganche del sistema)")
+    }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         // Nunca nos miramos a nosotros mismos
@@ -33,10 +43,24 @@ class NotiListenerService : NotificationListenerService() {
         // (sin leer, sin guardar, sin enviar). Se reactiva con el botón de Inicio.
         if (!Prefs.get(this).getBoolean(Prefs.LISTENING, true)) return
 
-        scope.launch { process(sbn) }
+        // Blindaje: NINGÚN error puede tumbar el proceso (un crash
+        // desengancharía el listener hasta reactivarlo en Ajustes).
+        try {
+            scope.launch { process(sbn) }
+        } catch (e: Exception) {
+            Log.e(TAG, "onNotificationPosted", e)
+        }
     }
 
     private suspend fun process(sbn: StatusBarNotification) {
+        try {
+            processInner(sbn)
+        } catch (e: Exception) {
+            Log.e(TAG, "process", e)
+        }
+    }
+
+    private suspend fun processInner(sbn: StatusBarNotification) {
         val notification: Notification = sbn.notification ?: return
 
         // Opción: ignorar notificaciones "en curso" (música, llamadas, navegación)
@@ -88,6 +112,14 @@ class NotiListenerService : NotificationListenerService() {
             return
         }
 
+        // ---- Análisis financiero: ¿es un PAGO real? ----
+        val pago = try {
+            PaymentFilter.analizar(title, text)
+        } catch (e: Exception) {
+            Log.e(TAG, "PaymentFilter", e); null
+        }
+        val wallet = Wallets.detect(appName)
+
         // ---- Historial local ----
         val saveHistory = prefs.getBoolean(Prefs.SAVE_HISTORY, true)
         val logId = if (saveHistory) {
@@ -98,7 +130,11 @@ class NotiListenerService : NotificationListenerService() {
                     title = title,
                     text = text,
                     postTime = sbn.postTime,
-                    loggedAt = System.currentTimeMillis()
+                    loggedAt = System.currentTimeMillis(),
+                    isPayment = pago != null,
+                    amount = pago?.amount,
+                    payerName = pago?.payerName,
+                    wallet = if (pago != null) wallet.name else null
                 )
             )
         } else 0L
@@ -106,9 +142,13 @@ class NotiListenerService : NotificationListenerService() {
         // ---- Reenvío cifrado al webhook ----
         if (!prefs.getBoolean(Prefs.FORWARD, true)) return
 
+        // Por defecto SOLO se envían los pagos (las promos ensuciarían la caja)
+        val soloPagos = prefs.getBoolean(Prefs.PAYMENTS_ONLY, true)
+        if (soloPagos && pago == null) return
+
         val payload = org.json.JSONObject().apply {
-            put("v", 1)
-            put("type", "notification")
+            put("v", 2)
+            put("type", if (pago != null) "payment" else "notification")
             put("ref", logId)
             put("device", Build.MODEL)
             put("app", appName)
@@ -116,11 +156,20 @@ class NotiListenerService : NotificationListenerService() {
             put("title", title)
             put("text", text)
             put("time", sbn.postTime)
+            if (pago != null) {
+                put("amount", pago.amount)
+                put("payer", pago.payerName ?: "")
+                put("wallet", wallet.name)
+            }
         }
 
         val ok = Sender.send(this, payload)
         if (logId > 0 && ok) {
             db.logs().markSent(logId, true, System.currentTimeMillis())
         }
+    }
+
+    companion object {
+        private const val TAG = "VerificaPE"
     }
 }

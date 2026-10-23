@@ -11,12 +11,27 @@
     <string name="menu_history">Historial local</string>
     <string name="menu_settings">Ajustes</string>
 
-    <!-- Inicio -->
+    <!-- Inicio (diseño financiero) -->
     <string name="power_button_desc">Encender o dormir el modo escucha</string>
-    <string name="listening_on_desc">● Escuchando: las notificaciones activadas se envían a la web.\nToca el botón para DORMIR el servicio.</string>
-    <string name="listening_off_desc">⏸ Dormido: no se lee ni se envía nada.\nToca el botón para volver a escuchar.</string>
-    <string name="listening_on_toast">Modo escucha activado ✔</string>
+    <string name="listening_on_desc">Escuchando pagos</string>
+    <string name="listening_off_desc">Dormido</string>
+    <string name="listening_on_toast">Modo escucha activado ✔ (reenganche solicitado)</string>
     <string name="listening_off_toast">Servicio dormido ⏸ (no se lee ni se envía nada)</string>
+    <string name="income_title">INGRESOS DE HOY</string>
+    <string name="income_count_fmt">%d pagos</string>
+    <string name="canal_count">%d canal(es)</string>
+    <string name="otp_blocked_count">%d OTP bloqueadas</string>
+    <string name="chip_hoy">Hoy</string>
+    <string name="chip_7dias">7 días</string>
+    <string name="chip_mes">Mes</string>
+    <string name="chip_todo">Todo</string>
+    <string name="btn_export">📤 CSV</string>
+    <string name="btn_test_pago">Probar envío</string>
+    <string name="pagos_empty">Aún no hay pagos registrados.\nActiva Yape (o tu billetera) en «Apps monitoreadas» y despierta el servicio.</string>
+    <string name="pago_sin_nombre">Pago recibido</string>
+    <string name="export_empty">No hay pagos para exportar</string>
+    <string name="export_title">Exportar pagos</string>
+    <string name="export_error">No se pudo exportar el CSV</string>
     <string name="access_card_title">Acceso a notificaciones</string>
     <string name="service_on">● Servicio activo: escuchando notificaciones</string>
     <string name="service_off">● Sin acceso: concede el permiso en Ajustes del sistema</string>
@@ -83,6 +98,7 @@
     <string name="sw_forward_label">Reenviar notificaciones al servidor</string>
     <string name="sw_ongoing_label">Ignorar notificaciones en curso (música, llamadas)</string>
     <string name="sw_history_label">Guardar historial local en el dispositivo</string>
+    <string name="sw_payments_only_label">Enviar al panel SOLO pagos reales (ignorar promos)</string>
     <string name="settings_section_security">Seguridad</string>
     <string name="otp_fixed_note">Filtro OTP SIEMPRE activo: las notificaciones de la app de SMS y las que parecen códigos de verificación nunca se guardan (contenido) ni se reenvían. No se puede desactivar.</string>
     <string name="e2e_note">Cifrado de extremo a extremo AES-256-GCM. El servidor web solo almacena datos cifrados; la clave solo existe en este dispositivo y en tu navegador.</string>

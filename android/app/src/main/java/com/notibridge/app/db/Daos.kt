@@ -65,6 +65,22 @@ interface NotificationLogDao {
 
     @Query("SELECT COUNT(*) FROM notification_logs WHERE ignoredReason IS NOT NULL")
     suspend fun countIgnored(): Int
+
+    // ── Consultas financieras (v1.3) ──
+    @Query("SELECT * FROM notification_logs WHERE isPayment = 1 ORDER BY loggedAt DESC LIMIT :limit")
+    suspend fun payments(limit: Int): List<NotificationLogEntity>
+
+    @Query(
+        "SELECT * FROM notification_logs WHERE isPayment = 1 AND loggedAt >= :since " +
+        "ORDER BY loggedAt DESC LIMIT :limit"
+    )
+    suspend fun paymentsSince(since: Long, limit: Int): List<NotificationLogEntity>
+
+    @Query("SELECT COALESCE(SUM(amount), 0) FROM notification_logs WHERE isPayment = 1 AND loggedAt >= :since")
+    suspend fun incomeSince(since: Long): Double
+
+    @Query("SELECT COUNT(*) FROM notification_logs WHERE isPayment = 1 AND loggedAt >= :since")
+    suspend fun paymentsCountSince(since: Long): Int
 }
 
 @Dao

@@ -1,260 +1,161 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView
+<LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fillViewport="true">
+    android:orientation="vertical"
+    android:padding="16dp">
 
+    <!-- ══════════ INGRESOS DE HOY (glassmorphism) ══════════ -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="16dp">
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@drawable/glass_card"
+        android:padding="18dp">
 
-        <!-- MODO ESCUCHA: botón circular para encender/dormir el servicio -->
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            app:cardCornerRadius="16dp"
-            app:contentPadding="16dp"
-            android:layout_marginBottom="12dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:gravity="center">
-
-                <ImageButton
-                    android:id="@+id/btn_power"
-                    android:layout_width="86dp"
-                    android:layout_height="86dp"
-                    android:background="@drawable/btn_power_selector"
-                    android:src="@drawable/ic_power"
-                    android:scaleType="centerInside"
-                    android:padding="20dp"
-                    android:contentDescription="@string/power_button_desc"
-                    android:elevation="4dp" />
-
-                <TextView
-                    android:id="@+id/listening_status"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:gravity="center"
-                    android:textSize="13sp"
-                    android:text="@string/listening_on_desc" />
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-
-        <!-- Estado del servicio -->
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            app:cardCornerRadius="16dp"
-            app:contentPadding="16dp"
-            android:layout_marginBottom="12dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/access_card_title"
-                    android:textAppearance="?attr/textAppearanceTitleMedium" />
-
-                <TextView
-                    android:id="@+id/service_status"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:text="@string/service_off" />
-
-                <Button
-                    android:id="@+id/btn_grant_access"
-                    style="?attr/borderlessButtonStyle"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:text="@string/btn_grant_access" />
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-
-        <!-- Estado del emparejamiento -->
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            app:cardCornerRadius="16dp"
-            app:contentPadding="16dp"
-            android:layout_marginBottom="12dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/pairing_card_title"
-                    android:textAppearance="?attr/textAppearanceTitleMedium" />
-
-                <TextView
-                    android:id="@+id/pair_status"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:text="@string/not_paired" />
-
-                <Button
-                    android:id="@+id/btn_go_pair"
-                    style="?attr/borderlessButtonStyle"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/btn_go_pair" />
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-
-        <!-- Estadísticas -->
         <LinearLayout
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginBottom="12dp">
-
-            <com.google.android.material.card.MaterialCardView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginEnd="6dp"
-                app:cardCornerRadius="16dp"
-                app:contentPadding="12dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:gravity="center">
-
-                    <TextView
-                        android:id="@+id/stat_today"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="0"
-                        android:textAppearance="?attr/textAppearanceHeadlineMedium"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/stat_today_label"
-                        android:textSize="11sp"
-                        android:textColor="@color/text_secondary" />
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
-
-            <com.google.android.material.card.MaterialCardView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:layout_marginEnd="6dp"
-                app:cardCornerRadius="16dp"
-                app:contentPadding="12dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:gravity="center">
-
-                    <TextView
-                        android:id="@+id/stat_sent"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="0"
-                        android:textAppearance="?attr/textAppearanceHeadlineMedium"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/stat_sent_label"
-                        android:textSize="11sp"
-                        android:textColor="@color/text_secondary" />
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
-
-            <com.google.android.material.card.MaterialCardView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                app:cardCornerRadius="16dp"
-                app:contentPadding="12dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:gravity="center">
-
-                    <TextView
-                        android:id="@+id/stat_otp"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="0"
-                        android:textAppearance="?attr/textAppearanceHeadlineMedium"
-                        android:textStyle="bold"
-                        android:textColor="@color/badge_otp" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/stat_otp_label"
-                        android:textSize="11sp"
-                        android:textColor="@color/text_secondary" />
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
-        </LinearLayout>
-
-        <!-- Recientes -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
+            android:layout_weight="1"
+            android:orientation="vertical">
 
             <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/recent_activity"
-                android:textAppearance="?attr/textAppearanceTitleMedium" />
-
-            <Button
-                android:id="@+id/btn_go_history"
-                style="?attr/borderlessButtonStyle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/view_history" />
+                android:text="@string/income_title"
+                android:textSize="12sp"
+                android:letterSpacing="0.1"
+                android:textColor="@color/text_soft" />
+
+            <TextView
+                android:id="@+id/income_total"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="S/ 0.00"
+                android:textSize="34sp"
+                android:textStyle="bold"
+                android:textColor="@color/money_green" />
+
+            <TextView
+                android:id="@+id/income_count"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="0 pagos hoy"
+                android:textSize="13sp"
+                android:textColor="@color/text_main" />
         </LinearLayout>
 
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/recent_list"
-            android:layout_width="match_parent"
+        <!-- Botón circular de dormir / despertar -->
+        <LinearLayout
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:nestedScrollingEnabled="false" />
+            android:orientation="vertical"
+            android:gravity="center">
 
-        <TextView
-            android:id="@+id/empty_recent"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:gravity="center"
-            android:text="@string/empty_recent"
-            android:textColor="@color/text_secondary" />
+            <ImageButton
+                android:id="@+id/btn_power"
+                android:layout_width="64dp"
+                android:layout_height="64dp"
+                android:background="@drawable/btn_power_selector"
+                android:src="@drawable/ic_power"
+                android:scaleType="centerInside"
+                android:padding="15dp"
+                android:contentDescription="@string/power_button_desc" />
+
+            <TextView
+                android:id="@+id/listening_status"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="@string/listening_on_desc"
+                android:textSize="10sp"
+                android:gravity="center"
+                android:maxWidth="120dp"
+                android:textColor="@color/text_soft" />
+        </LinearLayout>
     </LinearLayout>
-</ScrollView>
+
+    <!-- Estado de acceso / canales / OTP -->
+    <TextView
+        android:id="@+id/status_line"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:background="@drawable/glass_card"
+        android:textSize="12sp"
+        android:textColor="@color/text_soft"
+        android:clickable="true"
+        android:focusable="true" />
+
+    <!-- ══════════ FILTROS DE FECHA ══════════ -->
+    <HorizontalScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/chip_hoy"
+                style="@style/ChipFiltro"
+                android:text="@string/chip_hoy" />
+
+            <TextView
+                android:id="@+id/chip_7dias"
+                style="@style/ChipFiltro"
+                android:text="@string/chip_7dias" />
+
+            <TextView
+                android:id="@+id/chip_mes"
+                style="@style/ChipFiltro"
+                android:text="@string/chip_mes" />
+
+            <TextView
+                android:id="@+id/chip_todo"
+                style="@style/ChipFiltro"
+                android:text="@string/chip_todo" />
+
+            <TextView
+                android:id="@+id/btn_export"
+                style="@style/ChipFiltro"
+                android:text="@string/btn_export" />
+
+            <TextView
+                android:id="@+id/btn_test_pago"
+                style="@style/ChipFiltro"
+                android:text="@string/btn_test_pago" />
+        </LinearLayout>
+    </HorizontalScrollView>
+
+    <!-- ══════════ HISTORIAL DE PAGOS POR DÍA ══════════ -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/pagos_list"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="10dp"
+        android:clipToPadding="false"
+        android:paddingBottom="24dp" />
+
+    <TextView
+        android:id="@+id/pagos_empty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:gravity="center"
+        android:text="@string/pagos_empty"
+        android:textColor="@color/text_soft"
+        android:visibility="gone" />
+</LinearLayout>

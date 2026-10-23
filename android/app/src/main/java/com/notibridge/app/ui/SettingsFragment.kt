@@ -29,10 +29,12 @@ class SettingsFragment : Fragment(R.layout.fragment_settings) {
         val swForward: MaterialSwitch = view.findViewById(R.id.sw_forward)
         val swOngoing: MaterialSwitch = view.findViewById(R.id.sw_ongoing)
         val swHistory: MaterialSwitch = view.findViewById(R.id.sw_history)
+        val swPaymentsOnly: MaterialSwitch = view.findViewById(R.id.sw_payments_only)
 
         swForward.isChecked = prefs.getBoolean(Prefs.FORWARD, true)
         swOngoing.isChecked = prefs.getBoolean(Prefs.IGNORE_ONGOING, true)
         swHistory.isChecked = prefs.getBoolean(Prefs.SAVE_HISTORY, true)
+        swPaymentsOnly.isChecked = prefs.getBoolean(Prefs.PAYMENTS_ONLY, true)
 
         swForward.setOnCheckedChangeListener { _, checked ->
             prefs.edit().putBoolean(Prefs.FORWARD, checked).apply()
@@ -42,6 +44,9 @@ class SettingsFragment : Fragment(R.layout.fragment_settings) {
         }
         swHistory.setOnCheckedChangeListener { _, checked ->
             prefs.edit().putBoolean(Prefs.SAVE_HISTORY, checked).apply()
+        }
+        swPaymentsOnly.setOnCheckedChangeListener { _, checked ->
+            prefs.edit().putBoolean(Prefs.PAYMENTS_ONLY, checked).apply()
         }
 
         view.findViewById<Button>(R.id.btn_battery).setOnClickListener {

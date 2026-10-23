@@ -25,7 +25,12 @@ data class NotificationLogEntity(
     val loggedAt: Long,         // cuándo la registramos (epoch ms)
     val ignoredReason: String? = null, // "APP_SMS" u "OTP" si fue bloqueada
     val sent: Boolean = false,  // se envió con éxito al servidor
-    val sentAt: Long? = null
+    val sentAt: Long? = null,
+    // ── Datos financieros (v1.3) ──
+    val isPayment: Boolean = false, // TRUE solo si PaymentFilter detectó un pago real
+    val amount: Double? = null,      // monto en soles "S/ 25.00"
+    val payerName: String? = null,   // quién pagó
+    val wallet: String? = null       // nombre de la billetera (Yape, SIP, …)
 )
 
 /** Un emparejamiento con un panel web. Puede haber VARIOS (multi-QR). */

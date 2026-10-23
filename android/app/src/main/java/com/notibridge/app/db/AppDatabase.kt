@@ -17,7 +17,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         NotificationLogEntity::class,
         PairingEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -53,6 +53,18 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v2 → v3: columnas financieras de los pagos (monto, pagador, billetera).
+         */
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE notification_logs ADD COLUMN isPayment INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE notification_logs ADD COLUMN amount REAL")
+                db.execSQL("ALTER TABLE notification_logs ADD COLUMN payerName TEXT")
+                db.execSQL("ALTER TABLE notification_logs ADD COLUMN wallet TEXT")
+            }
+        }
+
         fun get(context: Context): AppDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
@@ -60,7 +72,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "notibridge.db"
                 )
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .build()
                     .also { instance = it }
             }

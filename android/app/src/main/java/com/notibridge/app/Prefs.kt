@@ -11,6 +11,7 @@ object Prefs {
     const val IGNORE_ONGOING = "ignore_ongoing" // Ignorar notificaciones "en curso" (música, llamadas)
     const val SAVE_HISTORY = "save_history"     // Guardar historial local
     const val LISTENING = "listening_enabled"   // Modo escucha (false = servicio dormido)
+    const val PAYMENTS_ONLY = "payments_only"   // Enviar solo pagos reales al panel (default true)
 
     fun get(context: Context) =
         context.getSharedPreferences("notibridge_prefs", Context.MODE_PRIVATE)
