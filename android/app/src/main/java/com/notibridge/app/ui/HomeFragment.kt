@@ -15,6 +15,7 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.notibridge.app.GuardianService
 import com.notibridge.app.NotiAccess
 import com.notibridge.app.NotiListenerService
 import com.notibridge.app.Prefs
@@ -79,7 +80,13 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
             val nowOn = !prefs.getBoolean(Prefs.LISTENING, true)
             prefs.edit().putBoolean(Prefs.LISTENING, nowOn).apply()
             updateListeningUi()
-            if (nowOn) despertarServicio()
+            // El Guardián acompaña la escucha: encendido = proceso vivo
+            if (nowOn) {
+                despertarServicio()
+                GuardianService.start(requireContext())
+            } else {
+                GuardianService.stop(requireContext())
+            }
             Toast.makeText(
                 requireContext(),
                 if (nowOn) R.string.listening_on_toast else R.string.listening_off_toast,
@@ -131,17 +138,12 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
     // ─────────────────── despertar con reenganche ───────────────────
 
     /**
-     * FIX del bug "duermo y despierto y ya no escucha": al despertar pedimos
-     * explícitamente al sistema que (re)enganchen el lector de notificaciones.
+     * FIX del bug "duermo y despierto y ya no escucha": al despertar forzamos
+     * el reenganche del lector (componente off/on + requestRebind), que
+     * cubre también el desenganche silencioso tras actualizar la app.
      */
     private fun despertarServicio() {
-        try {
-            android.service.notification.NotificationListenerService.requestRebind(
-                ComponentName(requireContext(), NotiListenerService::class.java)
-            )
-        } catch (e: Exception) {
-            // mejor esfuerzo
-        }
+        com.notibridge.app.ListenerKick.kick(requireContext())
     }
 
     private fun updateListeningUi() {
@@ -398,10 +400,24 @@ class PagosAdapter : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
     /** Fila de pago. */
     class PagoVH(view: View) : RecyclerView.ViewHolder(view) {
         val badge: TextView = view.findViewById(R.id.pago_badge)
+        val icon: android.widget.ImageView = view.findViewById(R.id.pago_icon)
         val pagador: TextView = view.findViewById(R.id.pago_pagador)
         val hora: TextView = view.findViewById(R.id.pago_hora)
         val monto: TextView = view.findViewById(R.id.pago_monto)
         val walletName: TextView = view.findViewById(R.id.pago_wallet)
+    }
+
+    /** Caché de iconos reales por paquete (los logos verdaderos del teléfono). */
+    private val iconCache = HashMap<String, android.graphics.drawable.Drawable?>()
+
+    private fun iconoReal(context: android.content.Context, pkg: String?): android.graphics.drawable.Drawable? {
+        if (pkg.isNullOrBlank()) return null
+        if (iconCache.containsKey(pkg)) return iconCache[pkg]
+        val d = try {
+            context.packageManager.getApplicationIcon(pkg)
+        } catch (e: Exception) { null }
+        iconCache[pkg] = d
+        return d
     }
 
     override fun getItemViewType(position: Int): Int =
@@ -435,9 +451,20 @@ class PagosAdapter : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
                 holder.hora.text = fHora.format(Date(fila.pago.loggedAt))
                 holder.monto.text = "S/ ${money.format(fila.pago.amount ?: 0.0)}"
                 holder.walletName.text = fila.pago.wallet ?: fila.pago.appName
-                holder.badge.text = fila.letra.toString()
-                holder.badge.backgroundTintList =
-                    android.content.res.ColorStateList.valueOf(fila.colorWallet)
+
+                // Icono REAL de la app (del teléfono); si falla, letra de color
+                val icono = iconoReal(holder.itemView.context, fila.pago.packageName)
+                if (icono != null) {
+                    holder.badge.visibility = View.GONE
+                    holder.icon.visibility = View.VISIBLE
+                    holder.icon.setImageDrawable(icono)
+                } else {
+                    holder.badge.visibility = View.VISIBLE
+                    holder.icon.visibility = View.GONE
+                    holder.badge.text = fila.letra.toString()
+                    holder.badge.backgroundTintList =
+                        android.content.res.ColorStateList.valueOf(fila.colorWallet)
+                }
             }
         }
     }

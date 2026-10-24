@@ -49,6 +49,25 @@ class SettingsFragment : Fragment(R.layout.fragment_settings) {
             prefs.edit().putBoolean(Prefs.PAYMENTS_ONLY, checked).apply()
         }
 
+        view.findViewById<Button>(R.id.btn_bg_data).setOnClickListener {
+            // Eximir a VerificaPE de la restricción de datos en segundo plano
+            // (Data Saver / MIUI): sin esto, los envíos con la app cerrada mueren.
+            try {
+                startActivity(
+                    Intent(
+                        android.provider.Settings.ACTION_IGNORE_BACKGROUND_DATA_RESTRICTIONS_SETTINGS,
+                        android.net.Uri.parse("package:" + requireContext().packageName)
+                    )
+                )
+            } catch (e: Exception) {
+                startActivity(Intent(android.provider.Settings.ACTION_DATA_USAGE_SETTINGS))
+            }
+        }
+        view.findViewById<Button>(R.id.btn_rebind).setOnClickListener {
+            com.notibridge.app.ListenerKick.kick(requireContext())
+            Toast.makeText(requireContext(), R.string.rebind_done, Toast.LENGTH_LONG).show()
+            startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+        }
         view.findViewById<Button>(R.id.btn_battery).setOnClickListener {
             try {
                 // Pide al sistema eximir a VerificaPE de la optimización de batería

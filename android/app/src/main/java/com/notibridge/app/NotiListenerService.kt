@@ -108,17 +108,20 @@ class NotiListenerService : NotificationListenerService() {
             }
         }
 
-        // Deduplicación robusta: la misma notificación puede llegar como hija
-        // de grupo y como resumen (a veces con textos ligeramente distintos).
+        // Deduplicación QUIRÚRGICA: solo descarta el resumen-de-grupo y su
+        // hija (mismo título + MISMO TEXTO COMPLETO + publicados en el mismo
+        // instante <2 s). Dos pagos REALES, aunque sean de la misma persona
+        // y del mismo monto, llegan con postTimes distintos y NUNCA se
+        // descartan. (v1.3.5 comparaba solo 60 caracteres: comía pagos de
+        // prueba repetidos porque el código de seguridad caía tras el corte).
         val recientes = db.logs().recentForPackage(
             sbn.packageName, System.currentTimeMillis() - 90_000
         )
         val duplicado = recientes.any { r ->
-            // Mismo instante de publicación (hija y resumen van en el mismo lote)
-            (kotlin.math.abs(r.postTime - sbn.postTime) < 5_000) ||
-                // O mismo título + texto normalizado (re-publicación de la misma)
-                (r.title == title && r.text != null && text.isNotBlank() &&
-                    normalizar(r.text!!) == normalizar(text))
+            kotlin.math.abs(r.postTime - sbn.postTime) < 2_000 &&
+                r.title == title &&
+                r.text != null && text.isNotBlank() &&
+                normalizar(r.text!!) == normalizar(text)
         }
         if (duplicado) return
 
@@ -193,7 +196,25 @@ class NotiListenerService : NotificationListenerService() {
             }
         }
 
-        val ok = Sender.send(this, payload)
+        val ok = try {
+            // Wakelock breve: con la pantalla bloqueada, algunos equipos
+            // suspenden la CPU a mitad del envío y este muere.
+            val pm = getSystemService(POWER_SERVICE) as android.os.PowerManager
+            val wl = pm.newWakeLock(
+                android.os.PowerManager.PARTIAL_WAKE_LOCK,
+                "verificape:envio"
+            ).also { it.acquire(20_000) }
+            try {
+                Sender.send(this, payload)
+            } finally {
+                if (wl.isHeld) wl.release()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "send", e)
+            false
+        }
+        // Si falló (p. ej. red bloqueada en segundo plano), la notificación
+        // queda con sent=false y el Guardián la reintentará cada minuto.
         if (logId > 0 && ok) {
             db.logs().markSent(logId, true, System.currentTimeMillis())
         }
@@ -202,7 +223,8 @@ class NotiListenerService : NotificationListenerService() {
     companion object {
         private const val TAG = "VerificaPE"
 
-        /** Colapsa espacios y recorta: para comparar textos casi idénticos. */
-        private fun normalizar(s: String) = s.replace(Regex("\\s+"), " ").trim().take(60)
+        /** Colapsa espacios (SIN truncar: un pago real nunca debe verse
+            "igual" a otro por un corte de texto). */
+        private fun normalizar(s: String) = s.replace(Regex("\\s+"), " ").trim()
     }
 }

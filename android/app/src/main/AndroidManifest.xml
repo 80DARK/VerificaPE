@@ -9,8 +9,15 @@
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
     <!-- Permite pedir al sistema la exención de optimización de batería desde Ajustes -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
-    <!-- Solo para publicar la notificación de "Probar lector" -->
+    <!-- Solo para publicar la notificación de "Probar lector" y la persistente del Guardián -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Guardián: mantener vivo el proceso contra los mata-procesos de los OEM -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <!-- Arrancar el Guardián tras reiniciar el teléfono -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Mantener la CPU despierta el instante justo del envío con pantalla bloqueada -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <uses-feature
         android:name="android.hardware.camera"
@@ -26,6 +33,26 @@
         android:usesCleartextTraffic="true">
         <!-- usesCleartextTraffic solo para facilitar pruebas en HTTP local (LAN).
              Para producción usa HTTPS en el servidor. -->
+
+        <!-- GUARDIÁN: servicio en primer plano que impide que el sistema mate
+             el proceso (y con él, el lector) al cerrar la app o bloquear. -->
+        <service
+            android:name=".GuardianService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Relay de notificaciones de pagos recibidos" />
+        </service>
+
+        <!-- Arranca el Guardián tras encender el teléfono -->
+        <receiver
+            android:name=".BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
 
         <!-- Escáner SIEMPRE vertical: la librería zxing lo declara
              "sensorLandscape" en su manifest; lo sobreescribimos. -->

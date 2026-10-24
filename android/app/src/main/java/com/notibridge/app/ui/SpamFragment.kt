@@ -170,11 +170,24 @@ class SpamAdapter(
 
     class VH(view: View) : RecyclerView.ViewHolder(view) {
         val badge: TextView = view.findViewById(R.id.spam_badge)
+        val icon: android.widget.ImageView = view.findViewById(R.id.spam_icon)
         val titulo: TextView = view.findViewById(R.id.spam_titulo)
         val texto: TextView = view.findViewById(R.id.spam_texto)
         val hora: TextView = view.findViewById(R.id.spam_hora)
         val btnPago: TextView = view.findViewById(R.id.spam_btn_pago)
         val btnBorrar: ImageButton = view.findViewById(R.id.spam_btn_borrar)
+    }
+
+    private val iconCache = HashMap<String, android.graphics.drawable.Drawable?>()
+
+    private fun iconoReal(context: android.content.Context, pkg: String?): android.graphics.drawable.Drawable? {
+        if (pkg.isNullOrBlank()) return null
+        if (iconCache.containsKey(pkg)) return iconCache[pkg]
+        val d = try {
+            context.packageManager.getApplicationIcon(pkg)
+        } catch (e: Exception) { null }
+        iconCache[pkg] = d
+        return d
     }
 
     override fun onCreateViewHolder(parent: android.view.ViewGroup, viewType: Int): VH =
@@ -186,8 +199,18 @@ class SpamAdapter(
         val item = items[position]
         val wallet = Wallets.detect(item.appName)
 
-        holder.badge.text = wallet.letter.toString()
-        holder.badge.backgroundTintList = android.content.res.ColorStateList.valueOf(wallet.color)
+        // Icono REAL de la app (del teléfono); si falla, letra de color
+        val icono = iconoReal(holder.itemView.context, item.packageName)
+        if (icono != null) {
+            holder.badge.visibility = View.GONE
+            holder.icon.visibility = View.VISIBLE
+            holder.icon.setImageDrawable(icono)
+        } else {
+            holder.badge.visibility = View.VISIBLE
+            holder.icon.visibility = View.GONE
+            holder.badge.text = wallet.letter.toString()
+            holder.badge.backgroundTintList = android.content.res.ColorStateList.valueOf(wallet.color)
+        }
         holder.hora.text = fHora.format(Date(item.loggedAt))
 
         if (item.ignoredReason != null) {

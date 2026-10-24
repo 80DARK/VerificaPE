@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#312e81"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+    <linearGradient id="mint" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#6ee7b7"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="32" y="32" width="448" height="448" rx="112" fill="url(#bg)"/>
+  <rect x="96" y="80" width="320" height="232" rx="28" fill="#1e1b4b" stroke="#f8fafc" stroke-width="18" stroke-linejoin="round"/>
+  <line x1="96" y1="132" x2="416" y2="132" stroke="#f8fafc" stroke-width="8" opacity="0.35"/>
+
+  <circle cx="132" cy="106" r="7" fill="#6ee7b7"/>
+  <circle cx="154" cy="106" r="7" fill="#6ee7b7" opacity="0.6"/>
+  <circle cx="176" cy="106" r="7" fill="#6ee7b7" opacity="0.3"/>
+  <rect x="204" y="98" width="150" height="16" rx="8" fill="#f8fafc" opacity="0.15"/>
+
+  <rect x="128" y="156" width="256" height="68" rx="18" fill="#10b981" fill-opacity="0.18" stroke="#34d399" stroke-width="6"/>
+  <circle cx="168" cy="190" r="21" fill="url(#mint)"/>
+  <path d="M157 190 l8 8 l15 -16" fill="none" stroke="#0f172a" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <line x1="204" y1="180" x2="340" y2="180" stroke="#f8fafc" stroke-width="9" stroke-linecap="round"/>
+  <line x1="204" y1="202" x2="284" y2="202" stroke="#f8fafc" stroke-width="7" stroke-linecap="round" opacity="0.45"/>
+
+  <rect x="128" y="240" width="256" height="44" rx="14" fill="#f8fafc" opacity="0.08"/>
+  <line x1="152" y1="262" x2="250" y2="262" stroke="#f8fafc" stroke-width="7" stroke-linecap="round" opacity="0.25"/>
+
+  <g fill="none" stroke="url(#mint)" stroke-width="14" stroke-linecap="round">
+    <path d="M182.5 364.5 A104 104 0 0 1 329.5 364.5"/>
+    <path d="M206.5 388.5 A70 70 0 0 1 305.5 388.5" opacity="0.65"/>
+    <path d="M230.5 412.5 A36 36 0 0 1 281.5 412.5" opacity="0.35"/>
+  </g>
+  <circle cx="256" cy="438" r="11" fill="#6ee7b7" opacity="0.5"/>
+</svg>

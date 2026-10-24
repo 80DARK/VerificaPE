@@ -112,11 +112,23 @@
                     android:textAppearance="?attr/textAppearanceTitleMedium" />
 
                 <Button
+                    android:id="@+id/btn_rebind"
+                    style="?attr/borderlessButtonStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/btn_rebind" />
+                <Button
                     android:id="@+id/btn_battery"
                     style="?attr/borderlessButtonStyle"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="@string/btn_battery" />
+                <Button
+                    android:id="@+id/btn_bg_data"
+                    style="?attr/borderlessButtonStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/btn_bg_data" />
                 <Button
                     android:id="@+id/btn_open_access"
                     style="?attr/borderlessButtonStyle"

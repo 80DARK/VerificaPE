@@ -116,6 +116,9 @@
     <string name="otp_fixed_note">Filtro OTP SIEMPRE activo: las notificaciones de la app de SMS y las que parecen códigos de verificación nunca se guardan (contenido) ni se reenvían. No se puede desactivar.</string>
     <string name="e2e_note">Cifrado de extremo a extremo AES-256-GCM. El servidor web solo almacena datos cifrados; la clave solo existe en este dispositivo y en tu navegador.</string>
     <string name="settings_section_actions">Acciones</string>
+    <string name="btn_rebind">⚡ Reactivar escucha (por si no llegan notificaciones)</string>
+    <string name="rebind_done">Reenganche forzado ✔ Prueba con «Probar lector» (menú Spam). Si sigue sin llegar, apaga y enciende VerificaPE en estos ajustes.</string>
+    <string name="btn_bg_data">🛰️ Datos sin restricción en segundo plano (envíos con app cerrada)</string>
     <string name="btn_battery">Liberar de la optimización de batería (fiabilidad)</string>
     <string name="btn_open_access">Abrir ajustes de acceso a notificaciones</string>
     <string name="btn_clear_local">Borrar historial local</string>

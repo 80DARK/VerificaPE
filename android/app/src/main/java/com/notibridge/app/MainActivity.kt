@@ -54,15 +54,35 @@ class MainActivity : AppCompatActivity() {
             SecureStore.migrateLegacy(applicationContext, legacy?.channelId)
         }
 
-        // Tras actualizar la app, Android a veces desengancha el servicio de
-        // notificaciones. Pedirle que lo reenganche al abrir VerificaPE
-        // (el sistema también lo reengancha solo tras reiniciar el teléfono).
+        // Tras actualizar la app, Android suele DESENGANCHAR el lector de
+        // notificaciones aunque el permiso siga activo. Al abrir VerificaPE
+        // forzamos el reenganche (componente off/on + requestRebind).
         if (NotiAccess.isEnabled(this)) {
-            try {
-                android.service.notification.NotificationListenerService.requestRebind(
-                    android.content.ComponentName(this, NotiListenerService::class.java)
-                )
-            } catch (e: Exception) { /* mejor esfuerzo */ }
+            ListenerKick.kick(this)
+        }
+
+        // Guardián: servicio en primer plano para que el sistema no mate
+        // el proceso (y el lector) al cerrar la app o bloquear el teléfono.
+        if (Prefs.get(this).getBoolean(Prefs.LISTENING, true)) {
+            GuardianService.start(this)
+        }
+
+        // Reenviar notificaciones que quedaron pendientes (red bloqueada,
+        // servidor caído, etc.): la cola se vacía al abrir la app.
+        lifecycleScope.launch(Dispatchers.IO) {
+            Sender.reintentarPendientes(applicationContext)
+        }
+
+        // Android 13+: pedir permiso para mostrar las notificaciones
+        // (la persistente del Guardián y la de "Probar lector")
+        if (android.os.Build.VERSION.SDK_INT >= 33 &&
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                this, android.Manifest.permission.POST_NOTIFICATIONS
+            ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            androidx.core.app.ActivityCompat.requestPermissions(
+                this, arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 100
+            )
         }
 
         if (savedInstanceState == null) navigateTo(R.id.nav_home)

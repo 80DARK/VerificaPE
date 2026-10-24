@@ -49,19 +49,22 @@ object WebhookClient {
     /**
      * POST al webhook con el sobre cifrado:
      * { "iv": "b64url", "ct": "b64url", "algo": "AES-256-GCM", "time": epoch_ms }
+     * El "time" del sobre es la HORA DE LA NOTIFICACIÓN (no del envío), para
+     * que el servidor deduplica reintentos con el mismo idempotency-key.
      */
     suspend fun postEncrypted(
         serverUrl: String,
         channelId: String,
         writeToken: String,
         iv: ByteArray,
-        ciphertext: ByteArray
+        ciphertext: ByteArray,
+        notifTime: Long
     ): Boolean = suspendCancellableCoroutine { cont ->
         val body = JSONObject().apply {
             put("iv", Crypto.b64url(iv))
             put("ct", Crypto.b64url(ciphertext))
             put("algo", "AES-256-GCM")
-            put("time", System.currentTimeMillis())
+            put("time", notifTime)
         }
         val request = Request.Builder()
             .url(serverUrl.trimEnd('/') + "/api/webhook/" + channelId)

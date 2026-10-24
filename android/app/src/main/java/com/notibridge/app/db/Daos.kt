@@ -127,6 +127,13 @@ interface NotificationLogDao {
         "AND loggedAt >= :desde ORDER BY id DESC LIMIT 30"
     )
     suspend fun recentForPackage(pkg: String, desde: Long): List<NotificationLogEntity>
+
+    /** Cola de reintentos: notificaciones con contenido que aún no llegaron a la web. */
+    @Query(
+        "SELECT * FROM notification_logs WHERE sent = 0 AND ignoredReason IS NULL " +
+        "AND text IS NOT NULL ORDER BY loggedAt ASC LIMIT :limit"
+    )
+    suspend fun pendingToSend(limit: Int): List<NotificationLogEntity>
 }
 
 @Dao

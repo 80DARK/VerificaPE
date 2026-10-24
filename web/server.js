@@ -63,6 +63,13 @@ try { db.exec('ALTER TABLE channels ADD COLUMN api_key_wrapped TEXT') } catch (e
 // v1.2 legacy: eliminar la columna de texto claro si aún existe
 try { db.exec('ALTER TABLE channels DROP COLUMN api_key') } catch (e) { /* no existe */ }
 
+// v1.3.5: webhook IDEMPOTENTE — el mismo mensaje (canal + hora de notificación)
+// solo se guarda una vez, así los reintentos de la app nunca duplican en el panel.
+try {
+  db.exec('DELETE FROM messages WHERE id NOT IN (SELECT MIN(id) FROM messages GROUP BY channel_id, time)')
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_canal_hora ON messages(channel_id, time)')
+} catch (e) { /* índice ya creado o duplicados imposibles */ }
+
 const insertChannel = db.prepare(
   'INSERT INTO channels (id, write_hash, read_hash, created_at) VALUES (?, ?, ?, ?)'
 )
@@ -71,7 +78,7 @@ const getChannelByApiHash = db.prepare('SELECT * FROM channels WHERE api_hash = 
 const setApiToken = db.prepare('UPDATE channels SET api_hash = ?, api_key_wrapped = ? WHERE id = ?')
 const setApiPaused = db.prepare('UPDATE channels SET api_paused = ? WHERE id = ?')
 const insertMessage = db.prepare(
-  'INSERT INTO messages (channel_id, iv, ct, algo, time, received_at) VALUES (?, ?, ?, ?, ?, ?)'
+  'INSERT OR IGNORE INTO messages (channel_id, iv, ct, algo, time, received_at) VALUES (?, ?, ?, ?, ?, ?)'
 )
 const getMessages = db.prepare(
   'SELECT id, channel_id, iv, ct, algo, time, received_at ' +
@@ -212,16 +219,25 @@ app.post('/api/webhook/:channelId', (req, res) => {
   }
   const t = Number(time)
   const now = Date.now()
+  // INSERT OR IGNORE + índice único (channel_id, time) = idempotente:
+  // si la app reintenta un envío, no se duplica.
   const info = insertMessage.run(
     channel.id,
-    iv,
-    ct,
-    algo,
+    iv, ct, algo,
     Number.isFinite(t) ? Math.trunc(t) : null,
     now
-  )
+    )
   trimMessages.run(channel.id, channel.id, MAX_MESSAGES_PER_CHANNEL)
   touchChannel.run(now, channel.id)
+
+  if (info.changes === 0) {
+    // Ya existía (reintento): responder OK con el id existente, sin reenviar push
+    const previo = db.prepare(
+      'SELECT id FROM messages WHERE channel_id = ? AND time = ? LIMIT 1'
+    ).get(channel.id, Number.isFinite(t) ? Math.trunc(t) : null)
+    return res.json({ ok: true, id: previo ? previo.id : null, duplicado: true })
+  }
+
   // PUSH EN VIVO: notifica al instante a los paneles conectados (SSE)
   sseBroadcast(channel.id, 'message', {
     id: Number(info.lastInsertRowid),
