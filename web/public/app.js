@@ -86,6 +86,11 @@ function fmtTime (ms) {
   return new Date(ms).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
 
+function fmtFecha (ms) {
+  if (!ms) return ''
+  return new Date(ms).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })
+}
+
 function fmtDay (ms) {
   const d = new Date(ms)
   const today = new Date()
@@ -540,24 +545,29 @@ function renderFeed () {
     renderedIds.add(m.id)
 
     if (pago) {
-      // ── Tarjeta FINANCIERA: billetera, monto y pagador ──
+      // ── Tarjeta FINANCIERA: billetera, monto, pagador y FECHA DEL YAPEO ──
       const w = walletInfo(m.plain.wallet || appName)
       const monto = montoDe(m)
       const pagador = m.plain.payer || m.plain.title || ''
+      const tYapeo = m.plain.time || m.received_at
       card.innerHTML =
         '<div class="msg-head">' +
           '<span class="msg-avatar" style="background:' + w.color + '">' + esc(w.letter) + '</span>' +
           '<span class="msg-app">' + esc(w.name) + '</span>' +
           (unread ? '<span class="badge-new">NUEVO</span>' : '') +
           (isTest ? '<span class="badge-type">TEST</span>' : '') +
-          '<span class="msg-time">' + esc(fmtTime(t)) + '</span>' +
         '</div>' +
         '<div class="msg-amount-row">' +
           '<span class="msg-amount">S/ ' + (monto !== null ? Number(monto).toFixed(2) : '—') + '</span>' +
           '<span class="msg-payer">' + esc(pagador || 'Pago recibido') + '</span>' +
+          '<div class="msg-fecha-principal">' +
+            '<span class="msg-fecha">' + esc(fmtFecha(tYapeo)) + '</span>' +
+            '<span class="msg-hora">' + esc(fmtTime(tYapeo)) + '</span>' +
+          '</div>' +
         '</div>' +
         ((m.plain.text && m.plain.text !== pagador)
-          ? '<div class="msg-text">' + esc(m.plain.text) + '</div>' : '')
+          ? '<div class="msg-text">' + esc(m.plain.text) + '</div>' : '') +
+        '<div class="msg-llegada">↳ llegó al servidor ' + esc(fmtTime(m.received_at)) + '</div>'
     } else {
       // ── Tarjeta SPAM: notificación que NO es pago ──
       const av = avatarFor(appName)
@@ -567,10 +577,10 @@ function renderFeed () {
           '<span class="msg-app">' + esc(appName) + '</span>' +
           '<span class="badge-type spam-badge">OTRO</span>' +
           (unread ? '<span class="badge-new">NUEVO</span>' : '') +
-          '<span class="msg-time">' + esc(fmtTime(t)) + '</span>' +
         '</div>' +
         '<div class="msg-title">' + esc(m.plain.title || '') + '</div>' +
-        '<div class="msg-text">' + esc(m.plain.text || '') + '</div>'
+        '<div class="msg-text">' + esc(m.plain.text || '') + '</div>' +
+        '<div class="msg-llegada">↳ llegó al servidor ' + esc(fmtTime(m.received_at)) + '</div>'
     }
 
     card.innerHTML +=

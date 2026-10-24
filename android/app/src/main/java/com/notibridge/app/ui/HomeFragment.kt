@@ -121,7 +121,9 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
         }
         pintarChips()
 
-        view.findViewById<TextView>(R.id.btn_export).setOnClickListener { exportarCsv() }
+        view.findViewById<TextView>(R.id.btn_export).setOnClickListener {
+            ExportarDialog().show(childFragmentManager, "exportar")
+        }
         view.findViewById<TextView>(R.id.btn_test_pago).setOnClickListener { enviarPagoPrueba() }
 
         // Datos EN VIVO (Room Flow): llegan sin recargar la pantalla
@@ -248,61 +250,7 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
         }
     }
 
-    // ─────────────────── CSV (Excel) ───────────────────
-
-    private fun exportarCsv() {
-        if (listaPagos.isEmpty()) {
-            Toast.makeText(requireContext(), R.string.export_empty, Toast.LENGTH_SHORT).show()
-            return
-        }
-        val appCtx = requireContext().applicationContext
-        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
-            try {
-                val dir = File(appCtx.cacheDir, "exports").apply { mkdirs() }
-                val archivo = File(
-                    dir,
-                    "verificape_pagos_${SimpleDateFormat("yyyyMMdd_HHmm", Locale.US).format(Date())}.csv"
-                )
-                archivo.writeText(generarCsv(), Charsets.UTF_8)
-                val uri = FileProvider.getUriForFile(
-                    appCtx, "${appCtx.packageName}.fileprovider", archivo
-                )
-                withContext(Dispatchers.Main) {
-                    if (!isAdded) return@withContext
-                    val intent = Intent(Intent.ACTION_SEND).apply {
-                        type = "text/csv"
-                        putExtra(Intent.EXTRA_STREAM, uri)
-                        addFlags(
-                            Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
-                        )
-                    }
-                    startActivity(Intent.createChooser(intent, getString(R.string.export_title)))
-                }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    if (isAdded) Toast.makeText(requireContext(), R.string.export_error, Toast.LENGTH_LONG).show()
-                }
-            }
-        }
-    }
-
-    private fun generarCsv(): String {
-        val fFecha = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
-        val fHora = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
-        val sb = StringBuilder()
-        sb.append("Fecha,Hora,Billetera,Pagador,Monto,App\n")
-        for (p in listaPagos) {
-            sb.append('"').append(fFecha.format(Date(p.loggedAt))).append("\",")
-            sb.append('"').append(fHora.format(Date(p.loggedAt))).append("\",")
-            sb.append('"').append(esc(p.wallet ?: p.appName)).append("\",")
-            sb.append('"').append(esc(p.payerName ?: "")).append("\",")
-            sb.append(moneyFormat.format(p.amount ?: 0.0)).append(",")
-            sb.append('"').append(esc(p.appName)).append("\"\n")
-        }
-        return sb.toString()
-    }
-
-    private fun esc(s: String) = s.replace("\"", "\"\"")
+    // ─────────────────── (Excel se genera desde ExportarDialog) ───────────────────
 
     // ─────────────────── pago de prueba ───────────────────
 

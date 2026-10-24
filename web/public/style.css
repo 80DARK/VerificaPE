@@ -469,13 +469,32 @@ button.danger:hover { background: rgba(248, 113, 113, 0.10); filter: none; }
 .msg-app { font-weight: 700; color: var(--text); }
 .msg-time { margin-left: auto; font-size: 11.5px; }
 
-/* Fila financiera: monto + pagador */
+/* Fila financiera: monto + pagador + fecha del yapeo */
 .msg-amount-row {
   display: flex; align-items: baseline; gap: 12px;
   margin-top: 9px; flex-wrap: wrap;
 }
 .msg-amount { font-size: 22px; font-weight: 800; color: var(--money-strong); letter-spacing: .3px; }
-.msg-payer { font-size: 14.5px; font-weight: 650; color: var(--text); }
+.msg-payer { font-size: 14.5px; font-weight: 650; color: var(--text); flex: 1; }
+
+/* Fecha/hora del YAPEO (la hora real en que ocurrió el pago) */
+.msg-fecha-principal {
+  display: flex; align-items: center; gap: 8px;
+  margin-left: auto;
+  background: var(--money-soft);
+  border: 1px solid var(--money);
+  border-radius: 10px;
+  padding: 3px 10px;
+}
+.msg-fecha { font-size: 12px; font-weight: 700; color: var(--money-strong); }
+.msg-hora { font-size: 13px; font-weight: 800; color: var(--money-strong); }
+
+/* Hora de llegada al servidor (chiquitito, discreto) */
+.msg-llegada {
+  margin-top: 6px; font-size: 10px;
+  color: var(--text-soft); opacity: .55;
+  font-style: italic;
+}
 
 .msg-title { margin-top: 8px; font-weight: 650; font-size: 14.5px; word-break: break-word; }
 .msg-text  { margin-top: 3px; font-size: 13px; color: var(--text-soft); white-space: pre-wrap; word-break: break-word; }

@@ -82,6 +82,14 @@ interface NotificationLogDao {
     @Query("SELECT COUNT(*) FROM notification_logs WHERE isPayment = 1 AND loggedAt >= :since")
     suspend fun paymentsCountSince(since: Long): Int
 
+    /** Pagos dentro de un rango de fechas (para exportar a Excel). */
+    @Query(
+        "SELECT * FROM notification_logs WHERE isPayment = 1 " +
+        "AND loggedAt >= :desde AND loggedAt <= :hasta " +
+        "ORDER BY loggedAt ASC LIMIT :limit"
+    )
+    suspend fun paymentsEntre(desde: Long, hasta: Long, limit: Int): List<NotificationLogEntity>
+
     // ── Sección Spam (diagnóstico de descartes) ──
     @Query("SELECT * FROM notification_logs WHERE isPayment = 0 ORDER BY loggedAt DESC LIMIT :limit")
     suspend fun nonPayments(limit: Int): List<NotificationLogEntity>

@@ -26,13 +26,17 @@
     <string name="chip_7dias">7 días</string>
     <string name="chip_mes">Mes</string>
     <string name="chip_todo">Todo</string>
-    <string name="btn_export">📤 CSV</string>
+    <string name="btn_export">📊 Excel</string>
     <string name="btn_test_pago">Probar envío</string>
     <string name="pagos_empty">Aún no hay pagos registrados.\nActiva Yape (o tu billetera) en «Apps monitoreadas» y despierta el servicio.</string>
     <string name="pago_sin_nombre">Pago recibido</string>
-    <string name="export_empty">No hay pagos para exportar</string>
-    <string name="export_title">Exportar pagos</string>
-    <string name="export_error">No se pudo exportar el CSV</string>
+    <string name="export_empty">No hay pagos en ese rango de fechas</string>
+    <string name="export_title">Exportar pagos a Excel</string>
+    <string name="export_error">No se pudo generar el Excel</string>
+    <string name="exp_exportar_btn">Generar Excel 📊</string>
+    <string name="exp_desde_fmt">📅 Desde: %s</string>
+    <string name="exp_hasta_fmt">📅 Hasta: %s</string>
+    <string name="exp_rango_mal">La fecha inicial debe ser anterior a la final</string>
 
     <!-- Spam (diagnóstico de descartes) -->
     <string name="spam_intro">Aquí ves lo que la app capturó pero NO clasificó como pago (promos, mensajes genéricos y bloqueos OTP). Si un pago real aparece aquí, pulsa «✓ Es pago» para corregirlo.</string>

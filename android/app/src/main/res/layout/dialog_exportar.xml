@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="20dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/export_title"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:textColor="@color/text_main" />
+
+    <TextView
+        android:id="@+id/exp_desde"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:padding="12dp"
+        android:background="@drawable/glass_card"
+        android:textSize="14sp"
+        android:textColor="@color/text_main" />
+
+    <TextView
+        android:id="@+id/exp_hasta"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:padding="12dp"
+        android:background="@drawable/glass_card"
+        android:textSize="14sp"
+        android:textColor="@color/text_main" />
+
+    <Button
+        android:id="@+id/exp_exportar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="18dp"
+        android:text="@string/exp_exportar_btn" />
+</LinearLayout>
